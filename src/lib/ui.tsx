@@ -51,7 +51,7 @@ const darkTheme = {
     secondary: '#E4E4E48D',
     tertiary: '#E4E4E45E',
     quaternary: '#E4E4E442',
-    link: '#87c3ff',
+    link: '#818cf8',
     onAccent: '#191c22',
   },
   bg: { editor: '#181818', chrome: '#141414', elevated: '#181818' },
@@ -66,7 +66,7 @@ const darkTheme = {
     secondary: '#E4E4E41F',
     tertiary: '#E4E4E414',
   },
-  accent: { primary: '#599CE7', control: '#599CE7' },
+  accent: { primary: '#6366f1', control: '#6366f1' },
   tokens: {} as Record<string, unknown>,
   palette: {} as Record<string, unknown>,
 };

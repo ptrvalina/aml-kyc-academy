@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import {
   Button,
   Callout,
@@ -26,6 +27,7 @@ import {
   useCanvasState,
   useHostTheme,
 } from './lib/ui';
+import { evaluateAnswer } from './lib/evaluator';
 
 type SwatchColor = 'blue' | 'green' | 'purple' | 'orange' | 'pink' | 'yellow' | 'gray';
 type TermCategory = 'basics' | 'screening' | 'monitoring' | 'investigation' | 'redflags' | 'systems';
@@ -1678,9 +1680,70 @@ const MODULES: Module[] = [
     passScore: 4,
     termIds: ['aml', 'kyc', 'ctf', 'fatf', 'fiu', 'cdd', 'edd', 'risk-score'],
     lessons: [
-      { title: 'Зачем существует AML', body: 'Преступники зарабатывают на наркотиках, мошенничестве, коррупции — и должны «отмыть» деньги, чтобы тратить их легально. Банки и финтех — главные ворота. Твоя работа: заметить подозрительное, расследовать, задокументировать, при необходимости — SAR.' },
-      { title: 'KYC vs CDD vs EDD', body: 'KYC — принцип «знай клиента». CDD — стандартная проверка для всех. EDD — усиленная для рискованных (PEP, офшоры, крупные суммы). Чем выше риск — тем глубже копаешь.' },
-      { title: 'FATF и регуляторы', body: 'FATF задаёт 40 рекомендаций — их внедряют все страны. FIU (FinCEN, NCA) принимает SAR. Без понимания FATF ты не поймёшь, почему банк просит именно эти документы.' },
+      {
+        title: 'Зачем существует AML — простыми словами',
+        body: `### Что такое «грязные деньги»
+Преступники зарабатывают на наркотиках, мошенничестве, взятках, киберкраже. Эти деньги нельзя просто потратить — банк спросит «откуда?». Поэтому преступники **прогоняют** суммы через счета, компании, крипту, чтобы деньги выглядели «чистыми».
+
+### Зачем нужен банк и финтех
+Банк, платёжка и биржа — главные «ворота» в финансовую систему. Закон обязывает их **видеть подозрительное** и сообщать государству. Ты — тот, кто это замечает и документирует.
+
+### Твоя роль аналитика (не детектив и не судья)
+Ты не доказываешь вину. Ты отвечаешь на вопрос: «Есть ли **обоснованное подозрение**, что деньги связаны с преступлением?» Если да — готовишь материалы для SAR. Если нет — закрываешь кейс с **audit trail** (записью всех шагов).
+
+### Пример для новичка
+Клиент — студент. За месяц прошло 180 000 EUR. Зарплаты такой нет → **несоответствие профилю** (inconsistent profile). Ты не говоришь «он преступник». Ты: собираешь факты → задаёшь RFI → оцениваешь ответ → решаешь: закрыть / EDD / SAR.
+
+### Три стадии отмывания (запомни навсегда)
+- **Placement** — ввод cash/средств в систему
+- **Layering** — запутывание (много переводов, страны, посредники)
+- **Integration** — «легальная» трата (недвижимость, бизнес)
+
+### Мини-чеклист новичка
+- Смотри на профиль клиента vs оборот
+- Каждое решение — письменно в case notes
+- Никогда не намекай клиенту о SAR (**tipping off** — уголовная ответственность)`,
+      },
+      {
+        title: 'KYC, CDD и EDD — в чём разница',
+        body: `### KYC (Know Your Customer)
+**Принцип:** «Знай, с кем работаешь». Это не одна проверка при открытии счёта, а **постоянный процесс**: кто клиент, чем занимается, откуда деньги, какой риск.
+
+### CDD (Customer Due Diligence) — стандартная проверка
+Для **обычного** риска: паспорт/ID, адрес, цель счёта, базовый screening (санкции/PEP). Достаточно для low/medium risk retail-клиента.
+
+### EDD (Enhanced Due Diligence) — усиленная проверка
+Когда риск **выше нормы**: PEP, офшор, adverse media, крупные суммы, high-risk jurisdiction. Нужно больше: SOW/SOF, UBO, контракты, OSINT, одобрение senior/MLRO.
+
+### Как выбирают уровень
+**Risk score** банка (1–100): страна, продукт, канал, поведение. Low → CDD. High → EDD + чаще пересмотр.
+
+### Пример
+Обычный фрилансер из EU → CDD. Депутат + переводы из ОАЭ → EDD + ongoing monitoring.
+
+### Ошибка новичка
+Думать, что KYC = «один раз загрузил паспорт и забыл». На работе KYC **живёт постоянно** — при изменении данных, алертах, пересмотре риска.`,
+      },
+      {
+        title: 'FATF, FIU и SAR — как устроена система',
+        body: `### FATF — «глобальный учебник»
+Financial Action Task Force — 40 рекомендаций, которые страны переносят в свои законы. Если банк просит «SOF» или «UBO» — это часто след FATF R.10, R.24.
+
+### FIU (Financial Intelligence Unit)
+Государственный орган, который **принимает SAR/STR** и передаёт в правоохранительные органы. Примеры: FinCEN (США), NCA (UK), FIU Latvia.
+
+### SAR / STR — что ты готовишь
+**Suspicious Activity Report** — отчёт о **подозрении**, не о доказанной преступности. Формулировка: факты, red flags, что проверял, почему объяснение не убедило.
+
+### Цепочка в банке
+Analyst → MLRO (одобрение) → FIU. Клиент **не узнаёт** о SAR (tipping off запрещён).
+
+### Пример SAR-триггера
+Structuring + high-risk country + клиент не ответил на RFI → обоснованное подозрение → эскалация MLRO → SAR.
+
+### Для собеседования
+Знай разницу: **CDD vs EDD**, **SAR vs блокировка**, **FIU vs регулятор (FCA, ECB)**.`,
+      },
     ],
     exam: [
       { id: 'm1-q1', question: 'Что такое AML?', options: [{ id: 'a', text: 'Система борьбы с отмыванием денег', correct: true }, { id: 'b', text: 'Программа лояльности банка', correct: false }, { id: 'c', text: 'Автоматическая торговля акциями', correct: false }], explain: 'AML = Anti-Money Laundering.' },
@@ -2108,105 +2171,6 @@ const FINAL_THEORY_PASS = 32;
 const FINAL_PRACTICAL_PASS = 7;
 const FINAL_PRACTICAL_MIN_SCORE = 60;
 
-function normalize(text: string): string {
-  return text.toLowerCase().replace(/ё/g, 'е').replace(/[^\p{L}\p{N}\s/-]/gu, ' ').replace(/\s+/g, ' ').trim();
-}
-
-function matchesAny(text: string, patterns: string[]): boolean {
-  const n = normalize(text);
-  return patterns.some((p) => n.includes(normalize(p)));
-}
-
-function matchesGroup(text: string, group: string[]): boolean {
-  return group.some((p) => matchesAny(text, [p]));
-}
-
-function evaluateAnswer(text: string, rubric: RubricCriterion[]): EvalResult {
-  const trimmed = text.trim();
-  if (trimmed.length < 15) {
-    return {
-      verdict: 'incorrect',
-      score: 0,
-      maxScore: 100,
-      percent: 0,
-      found: [],
-      missing: rubric.map((r) => r.label),
-      remarks: ['Ответ слишком короткий. Опиши red flags, RFI-вопросы и решение подробнее.'],
-      mistakes: [],
-    };
-  }
-
-  const found: Array<{ label: string; matched: string }> = [];
-  const missing: string[] = [];
-  const mistakes: string[] = [];
-  let score = 0;
-  let maxScore = 0;
-  let requiredMissed = 0;
-
-  for (const criterion of rubric) {
-    maxScore += criterion.weight;
-    const hit = criterion.patterns?.some((group) => matchesGroup(trimmed, group)) ?? false;
-    if (hit) {
-      score += criterion.weight;
-      const matched = criterion.patterns?.flat().find((p) => matchesAny(trimmed, [p])) ?? criterion.label;
-      found.push({ label: criterion.label, matched });
-    } else if (criterion.required) {
-      requiredMissed += 1;
-      missing.push(criterion.label);
-    } else {
-      missing.push(criterion.label);
-    }
-
-    if (criterion.mistakePatterns) {
-      for (const group of criterion.mistakePatterns) {
-        if (matchesGroup(trimmed, group)) {
-          mistakes.push(`Ошибка: «${group[0]}» — ${criterion.label}`);
-          score = Math.max(0, score - Math.round(criterion.weight * 0.5));
-        }
-      }
-    }
-  }
-
-  const wordCount = trimmed.split(/\s+/).length;
-  if (wordCount >= 80) score += 5;
-  if (wordCount >= 120) score += 5;
-  maxScore += 10;
-  score = Math.min(score, maxScore);
-
-  const percent = maxScore > 0 ? Math.round((score / maxScore) * 100) : 0;
-  const foundRatio = found.length / rubric.length;
-
-  const remarks: string[] = [];
-  if (found.length > 0) {
-    remarks.push(`Хорошо: ${found.map((f) => f.label).join(', ')}.`);
-  }
-  if (missing.length > 0 && missing.length <= 4) {
-    remarks.push(`Добавь: ${missing.slice(0, 4).join(', ')}.`);
-  } else if (missing.length > 4) {
-    remarks.push(`Не хватает ${missing.length} ключевых пунктов — см. список ниже.`);
-  }
-  if (mistakes.length > 0) {
-    remarks.push(...mistakes);
-  }
-
-  let verdict: Verdict;
-  if (percent >= 85 && requiredMissed === 0 && mistakes.length === 0) {
-    verdict = 'correct';
-    remarks.unshift('Отличный анализ — уровень рабочего аналитика.');
-  } else if (percent >= 60 && requiredMissed <= 1) {
-    verdict = 'partial_ok';
-    remarks.unshift('Верно, но: есть пробелы — доработай перед реальным кейсом.');
-  } else if (percent >= 35 || foundRatio >= 0.4) {
-    verdict = 'partial_bad';
-    remarks.unshift('Неверно, но: частично верно — см. что нашла и чего не хватает.');
-  } else {
-    verdict = 'incorrect';
-    remarks.unshift('Неверно: перечитай модуль и попробуй снова с опорой на термины.');
-  }
-
-  return { verdict, score, maxScore, percent, found, missing, remarks, mistakes };
-}
-
 const VERDICT_LABELS: Record<Verdict, string> = {
   correct: 'Верно',
   partial_ok: 'Верно, но…',
@@ -2220,6 +2184,57 @@ const VERDICT_TONE: Record<Verdict, 'success' | 'warning' | 'danger' | 'info'> =
   partial_bad: 'warning',
   incorrect: 'danger',
 };
+
+function LessonProse({ body }: { body: string }) {
+  const sections = body.split(/\n(?=### )/).filter(Boolean);
+  return (
+    <div className="lesson-prose">
+      {sections.map((section, si) => {
+        const lines = section.trim().split('\n');
+        const heading = lines[0].replace(/^###\s*/, '');
+        const content = lines.slice(1);
+        const items: ReactNode[] = [];
+        let listBuf: string[] = [];
+
+        const flushList = () => {
+          if (listBuf.length) {
+            items.push(<ul key={`ul-${si}-${items.length}`}>{listBuf.map((li, i) => <li key={i}>{li}</li>)}</ul>);
+            listBuf = [];
+          }
+        };
+
+        content.forEach((line, li) => {
+          const t = line.trim();
+          if (!t) return;
+          if (t.startsWith('- ')) {
+            listBuf.push(t.slice(2));
+            return;
+          }
+          flushList();
+          if (t.startsWith('**') && t.includes('**')) {
+            const m = t.match(/^\*\*(.+?)\*\*\s*(.*)$/);
+            items.push(
+              <p key={`p-${si}-${li}`}>
+                <strong>{m?.[1] ?? t}</strong>
+                {m?.[2] ? ` ${m[2]}` : ''}
+              </p>,
+            );
+            return;
+          }
+          items.push(<p key={`p-${si}-${li}`}>{t}</p>);
+        });
+        flushList();
+
+        return (
+          <div key={si} style={{ marginBottom: 20 }}>
+            <h4>{heading}</h4>
+            {items}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
 function DetailPanel() {
   const theme = useHostTheme();
@@ -2460,7 +2475,7 @@ function ModulePathGrid({ lang, passedModules, currentView, onSelect, modules, g
   const theme = useHostTheme();
 
   return (
-    <Grid columns={7} gap={8}>
+    <div className={`module-grid${modules.length <= 6 ? ' osint' : ''}`}>
       {modules.map((m, i) => {
         const done = passedModules.includes(m.id);
         const locked = i > 0 && !passedModules.includes(modules[i - 1].id);
@@ -2489,7 +2504,7 @@ function ModulePathGrid({ lang, passedModules, currentView, onSelect, modules, g
           </button>
         );
       })}
-    </Grid>
+    </div>
   );
 }
 
@@ -2812,6 +2827,12 @@ function CaseEvaluator({ caseId, lang }: { caseId: string; lang: Lang }) {
         </Button>
       </Row>
 
+      <Callout tone="info" title={lang === 'ru' ? 'Как оценивается ответ' : 'How answers are scored'}>
+        {lang === 'ru'
+          ? 'Проверка по смыслу и ключевым пунктам — не нужно повторять эталон дословно. Достаточно описать red flags, шаги, RFI и решение своими словами.'
+          : 'Scored by meaning and key points — no verbatim match required.'}
+      </Callout>
+
       {result && (
         <Callout tone={VERDICT_TONE[result.verdict]} title={`${verdictLabel(lang, result.verdict)} — ${result.percent}%`}>
           <Stack gap={8}>
@@ -3083,6 +3104,13 @@ function ModuleGlossary({ termIds }: { termIds: string[] }) {
   );
 }
 
+type CaseWorkflowState = {
+  status: 'open' | 'assigned' | 'rfi_sent' | 'escalated' | 'closed' | 'sar';
+  timeline: Array<{ id: string; time: string; action: string; detail: string }>;
+};
+
+const EMPTY_WORKFLOW: CaseWorkflowState = { status: 'open', timeline: [] };
+
 function ActimizeCaseConsole({ lang, cases = ALL_PRACTICE_CASES, defaultCaseId = 'case-001', statePrefix = 'case', consoleTitle }: {
   lang: Lang; cases?: PracticeCase[]; defaultCaseId?: string; statePrefix?: string; consoleTitle?: string;
 }) {
@@ -3093,7 +3121,25 @@ function ActimizeCaseConsole({ lang, cases = ALL_PRACTICE_CASES, defaultCaseId =
   const [selectedId, setSelectedId] = useCanvasState(`${statePrefix}-selected-id`, defaultCaseId);
   const [workTab, setWorkTab] = useCanvasState(`${statePrefix}-work-tab`, 'overview');
   const [assigned, setAssigned] = useCanvasState<Record<string, boolean>>(`${statePrefix}-assigned`, {});
+  const [workflows, setWorkflows] = useCanvasState<Record<string, CaseWorkflowState>>(`${statePrefix}-workflows`, {});
+  const [rfiDraft, setRfiDraft] = useCanvasState(`${statePrefix}-rfi-draft`, '');
+  const [showRfiForm, setShowRfiForm] = useCanvasState(`${statePrefix}-show-rfi`, false);
   const pageSize = 20;
+
+  const pushTimeline = (caseId: string, action: string, detail: string, status?: CaseWorkflowState['status']) => {
+    setWorkflows((prev) => {
+      const cur = prev[caseId] ?? EMPTY_WORKFLOW;
+      return {
+        ...prev,
+        [caseId]: {
+          status: status ?? cur.status,
+          timeline: [{ id: `${Date.now()}`, time: new Date().toLocaleString('ru-RU', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' }), action, detail }, ...cur.timeline].slice(0, 15),
+        },
+      };
+    });
+  };
+
+  const getWorkflow = (caseId: string) => workflows[caseId] ?? EMPTY_WORKFLOW;
 
   const caseCategories = [...new Set(cases.map((c) => c.category))];
 
@@ -3120,6 +3166,13 @@ function ActimizeCaseConsole({ lang, cases = ALL_PRACTICE_CASES, defaultCaseId =
   const selected = getCaseById(selectedId) ?? queueCases[0] ?? cases[0];
   const meta = selected ? getAlertMeta(selected) : null;
   const content = selected ? getLocalizedCase(selected, lang) : null;
+  const wf = selected ? getWorkflow(selected.id) : EMPTY_WORKFLOW;
+  const [investigationResult] = useCanvasState<EvalResult | null>(
+    selected ? `case-result-${selected.id}` : 'case-result-none',
+    null,
+  );
+  const canClose = (investigationResult?.percent ?? 0) >= 55;
+  const isAssigned = selected ? (assigned[selected.id] || wf.status !== 'open') : false;
 
   const priorityTone = (p: string): 'danger' | 'warning' | 'info' =>
     p === 'P1' ? 'danger' : p === 'P2' ? 'warning' : 'info';
@@ -3138,8 +3191,8 @@ function ActimizeCaseConsole({ lang, cases = ALL_PRACTICE_CASES, defaultCaseId =
           </Row>
         </div>
 
-        <div style={{ display: 'flex', minHeight: 560 }}>
-          <div style={{ width: 280, borderRight: `1px solid ${theme.stroke.primary}`, background: theme.fill.tertiary, display: 'flex', flexDirection: 'column' }}>
+        <div className="case-console">
+          <div className="case-queue" style={{ background: theme.fill.tertiary, display: 'flex', flexDirection: 'column' }}>
             <div style={{ padding: 12, borderBottom: `1px solid ${theme.stroke.tertiary}` }}>
               <Text weight="medium" size="small">{t(lang, 'queueTitle')}</Text>
               <div style={{ marginTop: 8 }}>
@@ -3204,7 +3257,7 @@ function ActimizeCaseConsole({ lang, cases = ALL_PRACTICE_CASES, defaultCaseId =
             </div>
           </div>
 
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+          <div className="case-main">
             {selected && meta && content ? (
               <>
                 <div style={{ padding: '12px 16px', borderBottom: `1px solid ${theme.stroke.primary}`, background: theme.fill.secondary }}>
@@ -3250,6 +3303,20 @@ function ActimizeCaseConsole({ lang, cases = ALL_PRACTICE_CASES, defaultCaseId =
                         headers={[t(lang, 'ruleTriggered'), 'Category', 'Module']}
                         rows={[[meta.rule, CASE_CAT_I18N[lang][selected.category], selected.moduleId.toUpperCase()]]}
                       />
+                      <Text weight="medium">Audit trail</Text>
+                      {wf.timeline.length === 0 ? (
+                        <Text size="small" tone="secondary">Назначь alert себе и начни расследование — шаги появятся здесь.</Text>
+                      ) : (
+                        wf.timeline.map((ev) => (
+                          <div key={ev.id} className="timeline-item">
+                            <div className="timeline-dot" />
+                            <div>
+                              <Text size="small" weight="medium">{ev.action}</Text>
+                              <Text size="small" tone="secondary">{ev.time} — {ev.detail}</Text>
+                            </div>
+                          </div>
+                        ))
+                      )}
                     </Stack>
                   )}
 
@@ -3301,13 +3368,88 @@ function ActimizeCaseConsole({ lang, cases = ALL_PRACTICE_CASES, defaultCaseId =
                 </div>
 
                 <div style={{ padding: '10px 16px', borderTop: `1px solid ${theme.stroke.primary}`, background: theme.fill.tertiary }}>
+                  {showRfiForm && (
+                    <Stack gap={8} style={{ marginBottom: 12 }}>
+                      <Text size="small" weight="medium">RFI — запрос клиенту (без tipping off)</Text>
+                      <TextArea
+                        value={rfiDraft}
+                        onChange={setRfiDraft}
+                        rows={3}
+                        placeholder="Например: Просим подтвердить цель переводов и предоставить контракт/invoice за период 01–15.06..."
+                      />
+                      <Row gap={8} wrap>
+                        <Button
+                          variant="primary"
+                          disabled={rfiDraft.trim().length < 20 || !isAssigned}
+                          onClick={() => {
+                            if (!selected) return;
+                            pushTimeline(selected.id, 'RFI sent', rfiDraft.slice(0, 120), 'rfi_sent');
+                            setShowRfiForm(false);
+                            setRfiDraft('');
+                          }}
+                        >
+                          Отправить RFI
+                        </Button>
+                        <Button variant="ghost" onClick={() => setShowRfiForm(false)}>Отмена</Button>
+                      </Row>
+                    </Stack>
+                  )}
                   <Row gap={8} wrap>
-                    <Button variant="ghost" onClick={() => setAssigned((a) => ({ ...a, [selected.id]: true }))}>{t(lang, 'assignToMe')}</Button>
-                    <Button variant="ghost">{t(lang, 'sendRfi')}</Button>
-                    <Button variant="ghost">{t(lang, 'escalateMlro')}</Button>
-                    <Button variant="ghost">{t(lang, 'closeAlert')}</Button>
-                    <Button variant="primary">{t(lang, 'fileSar')}</Button>
+                    <Button
+                      variant="ghost"
+                      disabled={!selected || isAssigned}
+                      onClick={() => {
+                        if (!selected) return;
+                        setAssigned((a) => ({ ...a, [selected.id]: true }));
+                        pushTimeline(selected.id, 'Assigned', 'Alert назначен на Trainee', 'assigned');
+                      }}
+                    >
+                      {t(lang, 'assignToMe')}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      disabled={!isAssigned || wf.status === 'rfi_sent'}
+                      onClick={() => setShowRfiForm(true)}
+                    >
+                      {t(lang, 'sendRfi')}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      disabled={!isAssigned || (investigationResult?.percent ?? 0) < 40}
+                      onClick={() => {
+                        if (!selected) return;
+                        pushTimeline(selected.id, 'Escalated to MLRO', 'Senior review requested', 'escalated');
+                      }}
+                    >
+                      {t(lang, 'escalateMlro')}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      disabled={!canClose || wf.status === 'closed'}
+                      onClick={() => {
+                        if (!selected) return;
+                        pushTimeline(selected.id, 'Alert closed', `Resolution: ${investigationResult?.percent ?? 0}% analysis score`, 'closed');
+                      }}
+                    >
+                      {t(lang, 'closeAlert')}
+                    </Button>
+                    <Button
+                      variant="primary"
+                      disabled={!isAssigned || wf.status !== 'escalated' || (investigationResult?.percent ?? 0) < 60}
+                      onClick={() => {
+                        if (!selected) return;
+                        pushTimeline(selected.id, 'SAR filed', 'Submitted to FIU via MLRO', 'sar');
+                      }}
+                    >
+                      {t(lang, 'fileSar')}
+                    </Button>
                   </Row>
+                  {!isAssigned && (
+                    <Text size="small" tone="secondary" style={{ marginTop: 8 }}>Сначала назначь alert себе (Assign to me).</Text>
+                  )}
+                  {isAssigned && !canClose && workTab !== 'investigation' && (
+                    <Text size="small" tone="secondary" style={{ marginTop: 8 }}>Перейди во вкладку Investigation и отправь анализ (≥55% для закрытия).</Text>
+                  )}
                 </div>
               </>
             ) : (
@@ -3713,7 +3855,7 @@ function ModuleView({ moduleId, lang, onNavigate, track = 'aml' }: {
             <div key={i}>
               <Card>
                 <CardHeader>{lesson.title}</CardHeader>
-                <CardBody><Text>{lesson.body}</Text></CardBody>
+                <CardBody><LessonProse body={lesson.body} /></CardBody>
               </Card>
             </div>
           ))}
@@ -4042,6 +4184,24 @@ function CourseFooterNav({ lang, view, onNavigate, passedModules, passedOsint, a
   );
 }
 
+const PROFESSIONAL_LITERATURE = [
+  { title: 'FATF Recommendations (2023)', author: 'FATF', type: 'Нормативка', why: '40 рекомендаций — фундамент AML/KYC во всех юрисдикциях', url: 'https://www.fatf-gafi.org/en/publications/Fatfrecommendations/Fatf-recommendations.html' },
+  { title: 'Wolfsberg Group — PEP Guidance', author: 'Wolfsberg Group', type: 'Guidance', why: 'PEP-риск, EDD, family/associates — must-read для KYC/EDD', url: 'https://www.wolfsberg-principles.com/' },
+  { title: 'BCBS CDD Guidance', author: 'Basel Committee', type: 'Guidance', why: 'Customer due diligence для банков — risk-based approach', url: 'https://www.bis.org/bcbs/publ/d285.htm' },
+  { title: 'ACAMS — CAMS Study Guide', author: 'ACAMS', type: 'Сертификация', why: 'Industry standard для AML analyst, часто оплачивает employer', url: 'https://www.acams.org/' },
+  { title: 'ICA Diplomas in AML', author: 'International Compliance Association', type: 'Сертификация', why: 'Альтернатива CAMS, сильна в UK/EU', url: 'https://www.int-comp.org/' },
+  { title: 'Money Laundering: A Guide for Criminal Investigators', author: 'Madamala & Kuhlhorn', type: 'Книга', why: 'Классика по стадиям отмывания и red flags', url: '' },
+  { title: 'The Compliance Handbook (KYC/AML)', author: 'Various / Wiley', type: 'Книга', why: 'Практический обзор KYC, TM, sanctions для банков', url: '' },
+  { title: 'Bellingcat OSINT Techniques', author: 'Bellingcat', type: 'OSINT', why: 'Методология открытых источников для EDD/adverse media', url: 'https://www.bellingcat.com/resources/how-tos/' },
+  { title: 'OSINT Framework', author: 'osintframework.com', type: 'OSINT', why: 'Каталог инструментов для корпоративного и people OSINT', url: 'https://osintframework.com/' },
+  { title: 'EU AML Regulation (AMLA package)', author: 'EU', type: 'Нормативка', why: 'Единый AML-regime EU — актуально для EU banks/fintech', url: 'https://finance.ec.eu/' },
+  { title: 'FinCEN SAR Activity Review', author: 'FinCEN', type: 'Практика', why: 'Реальные паттерны SAR в US — учит формулировкам', url: 'https://www.fincen.gov/' },
+  { title: 'Chainalysis Crypto Crime Report', author: 'Chainalysis', type: 'Crypto AML', why: 'Ежегодный обзор crypto ML typologies', url: 'https://www.chainalysis.com/' },
+  { title: 'OpenSanctions Handbook', author: 'OpenSanctions', type: 'Sanctions', why: 'Практика screening и entity resolution', url: 'https://www.opensanctions.org/docs/' },
+  { title: 'FFIEC BSA/AML Manual', author: 'FFIEC (US)', type: 'Manual', why: 'Детальный BSA manual — эталон для US AML programs', url: 'https://bsaaml.ffiec.gov/' },
+  { title: 'Transparency International — CPI', author: 'TI', type: 'Research', why: 'Corruption risk by country — для HRJ/PEP assessment', url: 'https://www.transparency.org/' },
+];
+
 export default function AmlKycTraining() {
   const [view, setView] = useCanvasState('main-view', 'home');
   const [lang, setLang] = useCanvasState<Lang>('course-lang', 'ru');
@@ -4069,34 +4229,42 @@ export default function AmlKycTraining() {
   ];
 
   return (
-    <Stack gap={20}>
-      <Row gap={16} align="center" wrap>
-        <Stack gap={4} style={{ flex: 1 }}>
-          <Text size="small" tone="secondary" weight="medium">AML/KYC ACADEMY</Text>
-          <H1>{t(lang, 'appTitle')}</H1>
-        </Stack>
-        <Stack gap={4}>
-          <Text size="small" tone="secondary">{t(lang, 'langLabel')}</Text>
-          <Select value={lang} onChange={(v) => setLang(v as Lang)} options={LANG_OPTIONS} />
-        </Stack>
-      </Row>
+    <div className="app-shell">
+      <header className="app-header">
+        <Row gap={16} align="center" wrap>
+          <Stack gap={4} style={{ flex: 1 }}>
+            <Text size="small" tone="secondary" weight="medium">AML/KYC ACADEMY</Text>
+            <H1 style={{ fontSize: 22 }}>{t(lang, 'appTitle')}</H1>
+          </Stack>
+          <Stack gap={4}>
+            <Text size="small" tone="secondary">{t(lang, 'langLabel')}</Text>
+            <Select value={lang} onChange={(v) => setLang(v as Lang)} options={LANG_OPTIONS} />
+          </Stack>
+        </Row>
+      </header>
 
-      <CourseHero
-        lang={lang}
-        passedCount={passedModules.length}
-        certified={certified}
-        onOpenFinal={() => setView('final-exam')}
-      />
+      <Stack gap={20}>
 
-      <Grid columns={5} gap={12}>
+      <div className="hero-card">
+        <CourseHero
+          lang={lang}
+          passedCount={passedModules.length}
+          certified={certified}
+          onOpenFinal={() => setView('final-exam')}
+        />
+      </div>
+
+      <div className="stats-grid">
         <Stat value={`${passedModules.length}/${MODULES.length}`} label={t(lang, 'modulesPassed')} tone={allModulesPassed ? 'success' : 'info'} />
         <Stat value={`${passedOsint.length}/${OSINT_MODULES.length}`} label={t(lang, 'osintModulesPassed')} tone={allOsintPassed ? 'success' : 'info'} />
         <Stat value="50" label={t(lang, 'navOsintCases')} tone="info" />
         <Stat value={String(PRACTICE_CASES.length)} label={t(lang, 'casesCount')} tone="info" />
         <Stat value={certified || osintCertified ? t(lang, 'certified') : t(lang, 'statusStudy')} label={t(lang, 'status')} tone={certified ? 'success' : 'warning'} />
-      </Grid>
+      </div>
 
-      <Select value={view} onChange={setView} options={navOptions} />
+      <div className="desktop-only-select">
+        <Select value={view} onChange={setView} options={navOptions} />
+      </div>
 
       {view === 'home' && (
         <Stack gap={16}>
@@ -4171,6 +4339,17 @@ export default function AmlKycTraining() {
 
       {view === 'resources' && (
         <Stack gap={16}>
+          <H2>Библиотека специалиста AML/KYC/OSINT</H2>
+          <Text tone="secondary">Must-read: нормативка, сертификации, OSINT, crypto и практические manuals.</Text>
+          <Table
+            headers={['Название', 'Автор / источник', 'Тип', 'Зачем']}
+            rows={PROFESSIONAL_LITERATURE.map((b) => [
+              b.url ? <Link href={b.url}>{b.title}</Link> : b.title,
+              b.author,
+              b.type,
+              b.why,
+            ])}
+          />
           <H2>Сертификация и тренажёры</H2>
           <Table
             headers={['Ресурс', 'Тип', 'Зачем']}
@@ -4186,14 +4365,34 @@ export default function AmlKycTraining() {
             ]}
           />
           <Callout tone="info" title="4-недельный план">
-            Нед 1: М1-М2 · Нед 2: М3 + OpenSanctions · Нед 3: М4-М5 · Нед 4: CAMS + резюме
+            Нед 1: М1–М2 + FATF · Нед 2: М3–М4 + OpenSanctions · Нед 3: М5–М6 + OSINT · Нед 4: CAMS + кейсы + резюме
           </Callout>
         </Stack>
       )}
 
       <CourseFooterNav lang={lang} view={view} onNavigate={setView} passedModules={passedModules} passedOsint={passedOsint} allModulesPassed={allModulesPassed} allOsintPassed={allOsintPassed} />
 
+      <nav className="mobile-nav" aria-label="Mobile navigation">
+        {[
+          { id: 'home', label: 'AML' },
+          { id: 'osint-home', label: 'OSINT' },
+          { id: 'polygone', label: 'Cases' },
+          { id: 'interview-trainer', label: 'Career' },
+          { id: 'resources', label: 'Books' },
+        ].map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            className={view === item.id || (item.id === 'home' && MODULES.some((m) => m.id === view)) ? 'active' : ''}
+            onClick={() => setView(item.id)}
+          >
+            {item.label}
+          </button>
+        ))}
+      </nav>
+
       <DetailPanel />
-    </Stack>
+      </Stack>
+    </div>
   );
 }
