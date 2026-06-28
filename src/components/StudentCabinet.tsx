@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import {
   Button,
   Callout,
@@ -19,23 +19,30 @@ import {
   useCanvasState,
   useHostTheme,
 } from '../lib/ui';
-import { COURSE_MODULES, COURSE_TITLE, type PracticeTask } from '../data/course-modules';
+import { getCourseModules, getCourseTitle } from '../data/course-localized';
+import type { PracticeTask } from '../data/course-modules';
 import {
   buildCertificateHtml,
   buildProgressReportHtml,
   openPrintWindow,
   type StudentProfile,
 } from '../lib/reports';
+import type { Lang } from '../i18n/types';
+import { contentLang } from '../i18n/types';
+import { tc } from '../i18n/content-strings';
+import { getSessionUser } from '../lib/auth';
+import { AuthPanel } from './AuthPanel';
+import { buildAchievementShareText, shareFacebook, shareLinkedIn } from '../lib/social-share';
 
-type Lang = 'ru' | 'en' | 'lt' | 'uk' | 'pl' | 'de' | 'fr' | 'es' | 'it' | 'pt';
-
-const TASK_TYPE_LABEL: Record<PracticeTask['type'], string> = {
-  quiz: 'Тест',
-  scenario: 'Сценарий',
-  case: 'Кейс-расследование',
-  communication: 'Имитация общения',
-  research: 'Исследование',
+const TASK_TYPE_LABEL: Record<'ru' | 'en', Record<PracticeTask['type'], string>> = {
+  ru: { quiz: 'Тест', scenario: 'Сценарий', case: 'Кейс-расследование', communication: 'Имитация общения', research: 'Исследование' },
+  en: { quiz: 'Quiz', scenario: 'Scenario', case: 'Case investigation', communication: 'Communication sim', research: 'Research' },
 };
+
+function taskTypeLabel(lang: Lang, type: PracticeTask['type']): string {
+  const cl = contentLang(lang);
+  return TASK_TYPE_LABEL[cl][type];
+}
 
 function defaultProfile(): StudentProfile {
   return { fullName: '', email: '', startedAt: new Date().toISOString().slice(0, 10) };
@@ -53,6 +60,7 @@ export function PracticeTasksPanel({
   const [notes, setNotes] = useCanvasState<Record<string, string>>('practice-notes', {});
   const [revealed, setRevealed] = useCanvasState<Record<string, boolean>>('practice-revealed', {});
 
+  const cl = contentLang(lang);
   if (tasks.length === 0) return null;
 
   return (
@@ -65,8 +73,8 @@ export function PracticeTasksPanel({
             <CardHeader
               trailing={
                 <Row gap={8} align="center">
-                  <Pill tone="neutral" size="sm">{TASK_TYPE_LABEL[task.type]}</Pill>
-                  {done && <Pill tone="success" size="sm">{lang === 'ru' ? 'Выполнено' : 'Done'}</Pill>}
+                  <Pill tone="neutral" size="sm">{taskTypeLabel(lang, task.type)}</Pill>
+                  {done && <Pill tone="success" size="sm">{cl === 'ru' ? 'Выполнено' : 'Done'}</Pill>}
                 </Row>
               }
             >
@@ -148,12 +156,16 @@ export function StudentCabinetView({
   totalCases: number;
   osintModules: Array<{ id: string; title: string; passed: boolean }>;
 }) {
+  const cl = contentLang(lang);
+  const courseModules = useMemo(() => getCourseModules(cl), [cl]);
+  const sessionUser = getSessionUser();
   const [profile, setProfile] = useCanvasState<StudentProfile>('student-profile', defaultProfile());
   const [completedTasks] = useCanvasState<string[]>('completed-tasks', []);
+  const [copied, setCopied] = useState(false);
 
   const allTasks = useMemo(
-    () => COURSE_MODULES.flatMap((m) => m.practiceTasks.map((t) => ({ ...t, moduleTitle: m.title }))),
-    [],
+    () => courseModules.flatMap((m) => m.practiceTasks.map((t) => ({ ...t, moduleTitle: m.title }))),
+    [courseModules],
   );
   const tasksDone = completedTasks.filter((id) => allTasks.some((t) => t.id === id)).length;
 
@@ -161,7 +173,7 @@ export function StudentCabinetView({
     const now = new Date().toLocaleDateString(lang === 'ru' ? 'ru-RU' : 'en-GB');
     return {
       profile,
-      modules: COURSE_MODULES.map((m) => ({
+      modules: courseModules.map((m) => ({
         id: m.id,
         title: m.title,
         passed: passedModules.includes(m.id),
@@ -179,23 +191,48 @@ export function StudentCabinetView({
       osintCertified,
       completedTasks: allTasks.filter((t) => completedTasks.includes(t.id)).map((t) => `${t.moduleTitle}: ${t.title}`),
       generatedAt: now,
+      lang: cl,
     };
-  }, [profile, passedModules, certified, osintCertified, completedTasks, allTasks, totalCases, lang, osintModules]);
+  }, [profile, passedModules, certified, osintCertified, completedTasks, allTasks, totalCases, lang, osintModules, courseModules, cl]);
 
-  const canCertificate = certified && profile.fullName.trim().length > 0;
+  const canCertificate = certified && (profile.fullName.trim().length > 0 || !!sessionUser);
+  const shareText = buildAchievementShareText({
+    fullName: profile.fullName || sessionUser?.fullName || '',
+    modulesPassed: passedModules.length,
+    totalModules: courseModules.length,
+    certified,
+    lang: cl,
+  });
+
+  const handleShareCopy = async () => {
+    await navigator.clipboard.writeText(shareText);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
 
   return (
     <Stack gap={20}>
+      {!sessionUser && (
+        <Stack gap={12}>
+          <Callout tone="info">{tc(cl, 'guestMode')}</Callout>
+          <AuthPanel lang={lang} onSuccess={() => {
+            const u = getSessionUser();
+            if (u) setProfile((p) => ({ ...p, fullName: u.fullName, email: u.email }));
+          }} />
+        </Stack>
+      )}
+
       <Stack gap={6}>
-        <H2>{lang === 'ru' ? 'Личный кабинет' : 'Student cabinet'}</H2>
-        <Text tone="secondary">{COURSE_TITLE}</Text>
+        <H2>{cl === 'ru' ? 'Личный кабинет' : 'Student cabinet'}</H2>
+        <Text tone="secondary">{getCourseTitle(cl)}</Text>
+        {sessionUser && <Pill tone="success" size="sm">{sessionUser.email}</Pill>}
       </Stack>
 
       <div className="stats-grid">
         <Stat
-          value={`${passedModules.length}/${COURSE_MODULES.length}`}
-          label={lang === 'ru' ? 'Модулей сдано' : 'Modules passed'}
-          tone={passedModules.length === COURSE_MODULES.length ? 'success' : 'info'}
+          value={`${passedModules.length}/${courseModules.length}`}
+          label={cl === 'ru' ? 'Модулей сдано' : 'Modules passed'}
+          tone={passedModules.length === courseModules.length ? 'success' : 'info'}
         />
         <Stat
           value={`${tasksDone}/${allTasks.length}`}
@@ -252,19 +289,19 @@ export function StudentCabinetView({
       </Card>
 
       <Card>
-        <CardHeader>{lang === 'ru' ? 'Прогресс по модулям' : 'Module progress'}</CardHeader>
+        <CardHeader>{cl === 'ru' ? 'Прогресс по модулям' : 'Module progress'}</CardHeader>
         <CardBody>
           <UsageBar
             segments={[
               { id: 'done', value: passedModules.length, color: 'green' },
-              { id: 'left', value: Math.max(0, COURSE_MODULES.length - passedModules.length), color: 'gray' },
+              { id: 'left', value: Math.max(0, courseModules.length - passedModules.length), color: 'gray' },
             ]}
-            total={COURSE_MODULES.length}
-            topLeftLabel={lang === 'ru' ? 'Основной курс' : 'Main course'}
-            topRightLabel={`${passedModules.length}/${COURSE_MODULES.length}`}
+            total={courseModules.length}
+            topLeftLabel={cl === 'ru' ? 'Основной курс' : 'Main course'}
+            topRightLabel={`${passedModules.length}/${courseModules.length}`}
           />
           <Stack gap={8} style={{ marginTop: 16 }}>
-            {COURSE_MODULES.map((m) => (
+            {courseModules.map((m) => (
               <Row key={m.id} gap={8} align="center">
                 <Pill tone={passedModules.includes(m.id) ? 'success' : 'neutral'} size="sm">
                   {passedModules.includes(m.id) ? '✓' : m.id.toUpperCase()}
@@ -292,16 +329,25 @@ export function StudentCabinetView({
             <Row gap={8} wrap>
               <Button
                 variant="primary"
-                onClick={() => openPrintWindow(buildProgressReportHtml(reportData), lang === 'ru' ? 'Отчёт о прогрессе' : 'Progress report')}
+                onClick={() => openPrintWindow(buildProgressReportHtml(reportData), cl === 'ru' ? 'Отчёт' : 'Report', cl)}
               >
-                {lang === 'ru' ? 'Скачать отчёт (PDF/печать)' : 'Download report (print/PDF)'}
+                {cl === 'ru' ? 'Скачать отчёт (PDF/печать)' : 'Download report (print/PDF)'}
               </Button>
               <Button
                 variant="ghost"
                 disabled={!canCertificate}
-                onClick={() => openPrintWindow(buildCertificateHtml(reportData), lang === 'ru' ? 'Сертификат' : 'Certificate')}
+                onClick={() => openPrintWindow(buildCertificateHtml(reportData), cl === 'ru' ? 'Сертификат' : 'Certificate', cl)}
               >
-                {lang === 'ru' ? 'Сертификат' : 'Certificate'}
+                {cl === 'ru' ? 'Сертификат' : 'Certificate'}
+              </Button>
+              <Button style={{ background: '#0a66c2', color: '#fff' }} variant="primary" onClick={() => shareLinkedIn({ title: getCourseTitle(cl), summary: shareText })}>
+                {tc(cl, 'shareLinkedIn')}
+              </Button>
+              <Button style={{ background: '#1877f2', color: '#fff' }} variant="primary" onClick={() => shareFacebook({ quote: shareText })}>
+                {tc(cl, 'shareFacebook')}
+              </Button>
+              <Button variant="ghost" onClick={handleShareCopy}>
+                {copied ? tc(cl, 'shareCopied') : tc(cl, 'shareCopy')}
               </Button>
             </Row>
             {!certified && (

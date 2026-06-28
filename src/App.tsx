@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useEffect, useMemo, type ReactNode } from 'react';
 import {
   Button,
   Callout,
@@ -29,7 +29,12 @@ import {
 } from './lib/ui';
 import { evaluateAnswer } from './lib/evaluator';
 import { COURSE_MODULES, COURSE_MODULE_META, COURSE_TITLE, COURSE_SUBTITLE, type PracticeTask, type CourseModule } from './data/course-modules';
+import { getCourseModules, getCourseModuleMeta, getCourseTitle, getCourseSubtitle } from './data/course-localized';
 import { PracticeTasksPanel, StudentCabinetView } from './components/StudentCabinet';
+import { LiteratureView, TrainersView, NewsView, ResourcesHubView } from './components/ContentViews';
+import { AuthHeaderButton } from './components/AuthPanel';
+import { contentLang } from './i18n/types';
+import { tc, getCategoryLabels } from './i18n/content-strings';
 
 type SwatchColor = 'blue' | 'green' | 'purple' | 'orange' | 'pink' | 'yellow' | 'gray';
 type TermCategory = 'basics' | 'screening' | 'monitoring' | 'investigation' | 'redflags' | 'systems';
@@ -229,7 +234,8 @@ type UiKey =
   | 'finalExamPass' | 'certified' | 'optional' | 'moduleObjectives' | 'moduleTakeaways' | 'proTip' | 'courseProgress'
   | 'navOsintTrack' | 'navOsintCases' | 'navInterview' | 'osintTrackTitle' | 'osintFinalExam' | 'osintModulesPassed'
   | 'footerAml' | 'footerOsint' | 'footerPractice' | 'footerOptional' | 'footerCareer' | 'jobSearchTitle' | 'interviewPrep'
-  | 'navMyProgress' | 'tabPracticeTasks';
+  | 'navMyProgress' | 'tabPracticeTasks'
+  | 'navLiterature' | 'navTrainers' | 'navNews';
 
 const UI: Record<string, Partial<Record<UiKey, string>>> = {
   ru: {
@@ -254,6 +260,7 @@ const UI: Record<string, Partial<Record<UiKey, string>>> = {
     foundInAnswer: 'Найдено в ответе', missing: 'Не хватает', mistakes: 'Ошибки',
     howToPass: '8 модулей: урок → практика → тест (80%). Следующий открывается после сдачи. Финальный экзамен + отчёт в личном кабинете.',
     navMyProgress: 'Мой прогресс', tabPracticeTasks: 'Задания ТЗ',
+    navLiterature: 'Литература', navTrainers: 'Тренажёры', navNews: 'Новости AML',
     verdictCorrect: 'Верно', verdictPartialOk: 'Верно, но…', verdictPartialBad: 'Неверно, но…', verdictIncorrect: 'Неверно',
     contentEnNote: '', worldCheck: 'World-Check One', noHits: 'No PEP/Sanctions hits', screeningPending: 'Review required',
     mockTxn: 'Triggered transactions', profileMismatch: 'Profile vs activity',
@@ -280,6 +287,7 @@ const UI: Record<string, Partial<Record<UiKey, string>>> = {
     foundInAnswer: 'Found in answer', missing: 'Missing', mistakes: 'Mistakes',
     howToPass: '8 modules: lesson → practice → test (80%). Final exam + progress report in student cabinet.',
     navMyProgress: 'My progress', tabPracticeTasks: 'Practice tasks',
+    navLiterature: 'Literature', navTrainers: 'Trainers', navNews: 'AML News',
     verdictCorrect: 'Correct', verdictPartialOk: 'Correct, but…', verdictPartialBad: 'Incorrect, but…', verdictIncorrect: 'Incorrect',
     contentEnNote: '', worldCheck: 'World-Check One', noHits: 'No PEP/Sanctions hits', screeningPending: 'Review required',
     mockTxn: 'Triggered transactions', profileMismatch: 'Profile vs activity',
@@ -2052,10 +2060,10 @@ function FlowDiagram({ steps, edges }: { steps: Array<{ id: string; label: strin
   );
 }
 
-function CourseHero({ lang, passedCount, certified, onOpenFinal }: { lang: Lang; passedCount: number; certified: boolean; onOpenFinal: () => void }) {
+function CourseHero({ lang, passedCount, certified, onOpenFinal, moduleCount }: { lang: Lang; passedCount: number; certified: boolean; onOpenFinal: () => void; moduleCount: number }) {
   const theme = useHostTheme();
-  const pct = Math.round((passedCount / MODULES.length) * 100);
-  const allModules = passedCount === MODULES.length;
+  const pct = Math.round((passedCount / moduleCount) * 100);
+  const allModules = passedCount === moduleCount;
 
   return (
     <div style={{ padding: 20, borderRadius: 8, border: `1px solid ${theme.stroke.primary}`, background: theme.fill.secondary }}>
@@ -2075,11 +2083,11 @@ function CourseHero({ lang, passedCount, certified, onOpenFinal }: { lang: Lang;
         <UsageBar
           segments={[
             { id: 'done', value: passedCount, color: 'green' },
-            { id: 'left', value: Math.max(0, MODULES.length - passedCount), color: 'gray' },
+            { id: 'left', value: Math.max(0, moduleCount - passedCount), color: 'gray' },
           ]}
-          total={MODULES.length}
+          total={moduleCount}
           topLeftLabel={t(lang, 'courseProgress')}
-          topRightLabel={`${passedCount}/${MODULES.length}`}
+          topRightLabel={`${passedCount}/${moduleCount}`}
         />
         {allModules && !certified && (
           <Callout tone="success" title={t(lang, 'finalExamUnlocked')}>
@@ -2496,7 +2504,9 @@ function CaseEvaluator({ caseId, lang }: { caseId: string; lang: Lang }) {
   );
 }
 
-function GlossaryView({ filterCategory }: { filterCategory?: TermCategory | 'all' }) {
+function GlossaryView({ filterCategory, lang }: { filterCategory?: TermCategory | 'all'; lang: Lang }) {
+  const cl = contentLang(lang);
+  const catLabels = getCategoryLabels(cl);
   const [readTerms, setReadTerms] = useCanvasState<string[]>('read-terms', []);
   const [, setPanel] = useCanvasState<DetailPanelState>('detail-panel', null);
   const [catFilter, setCatFilter] = useCanvasState<TermCategory | 'all'>('glossary-cat', filterCategory ?? 'all');
@@ -2504,15 +2514,16 @@ function GlossaryView({ filterCategory }: { filterCategory?: TermCategory | 'all
 
   return (
     <Stack gap={8}>
+      <H2>{tc(cl, 'glossaryTitle')}</H2>
       <Row gap={12} align="center">
-        <Stat value={`${readTerms.length}/${GLOSSARY.length}`} label="Терминов изучено" tone={readTerms.length === GLOSSARY.length ? 'success' : 'info'} />
+        <Stat value={`${readTerms.length}/${GLOSSARY.length}`} label={tc(cl, 'glossaryTermsLearned')} tone={readTerms.length === GLOSSARY.length ? 'success' : 'info'} />
       </Row>
       <Select
         value={catFilter}
         onChange={(v) => setCatFilter(v as TermCategory | 'all')}
         options={[
-          { value: 'all', label: 'Все категории' },
-          ...Object.entries(CATEGORY_LABELS).map(([k, v]) => ({ value: k, label: v })),
+          { value: 'all', label: tc(cl, 'glossaryAllCategories') },
+          ...Object.entries(catLabels).map(([k, v]) => ({ value: k, label: v })),
         ]}
       />
       {terms.map((term) => (
@@ -2522,22 +2533,22 @@ function GlossaryView({ filterCategory }: { filterCategory?: TermCategory | 'all
             leading={<Swatch color={term.color} />}
             trailing={
               <Row gap={8} align="center">
-                <DetailButton label="Подробнее" onClick={() => setPanel({ kind: 'term', id: term.id })} />
+                <DetailButton label={tc(cl, 'regulationsDetails')} onClick={() => setPanel({ kind: 'term', id: term.id })} />
                 <Checkbox
                   checked={readTerms.includes(term.id)}
                   onChange={(c) =>
                     setReadTerms((prev) => (c ? [...new Set([...prev, term.id])] : prev.filter((id) => id !== term.id)))
                   }
-                  label="Понятно"
+                  label={t(lang, 'understood')}
                 />
               </Row>
             }
           >
             <Stack gap={6} style={{ paddingLeft: 20 }}>
-              <Pill tone="neutral" size="sm">{CATEGORY_LABELS[term.category]}</Pill>
+              <Pill tone="neutral" size="sm">{catLabels[term.category]}</Pill>
               <Text>{term.simple}</Text>
-              <Text size="small" tone="secondary">Пример: {term.example}</Text>
-              <DetailButton label="Полное описание + English" onClick={() => setPanel({ kind: 'term', id: term.id })} />
+              <Text size="small" tone="secondary">{tc(cl, 'glossaryExample')} {term.example}</Text>
+              <DetailButton label={cl === 'ru' ? 'Полное описание + English' : 'Full description + English'} onClick={() => setPanel({ kind: 'term', id: term.id })} />
             </Stack>
           </CollapsibleSection>
         </div>
@@ -2546,17 +2557,19 @@ function GlossaryView({ filterCategory }: { filterCategory?: TermCategory | 'all
   );
 }
 
-function RegulationsView() {
+function RegulationsView({ lang }: { lang: Lang }) {
+  const cl = contentLang(lang);
+  const allLabel = cl === 'ru' ? 'Все' : 'All';
   const [, setPanel] = useCanvasState<DetailPanelState>('detail-panel', null);
-  const [region, setRegion] = useCanvasState('reg-region', 'Все');
-  const filtered = region === 'Все' ? REGULATIONS : REGULATIONS.filter((r) => r.region === region);
+  const [region, setRegion] = useCanvasState('reg-region', allLabel);
+  const filtered = region === allLabel ? REGULATIONS : REGULATIONS.filter((r) => r.region === region);
+  const regions = [allLabel, ...REGIONS.filter((r) => r !== 'Все' && r !== 'All')];
 
   return (
     <Stack gap={16}>
-      <Text>
-        Мировая нормативная база AML/CFT/Sanctions. Нажми «Подробнее» на любой стране — полное описание законов, FIU, SAR и English terms.
-      </Text>
-      <Select value={region} onChange={setRegion} options={REGIONS.map((r) => ({ value: r, label: r }))} />
+      <H2>{tc(cl, 'regulationsTitle')}</H2>
+      <Text tone="secondary">{tc(cl, 'regulationsSubtitle')}</Text>
+      <Select value={region} onChange={setRegion} options={regions.map((r) => ({ value: r, label: r }))} />
       <Grid columns={2} gap={12}>
         {filtered.map((reg) => (
           <div key={reg.id}>
@@ -2570,7 +2583,7 @@ function RegulationsView() {
                   <Text size="small">{reg.name}</Text>
                   <Text size="small" tone="secondary">{reg.summary}</Text>
                   <Row gap={8}>
-                    <DetailButton label="Подробнее" onClick={() => setPanel({ kind: 'regulation', id: reg.id })} />
+                    <DetailButton label={tc(cl, 'regulationsDetails')} onClick={() => setPanel({ kind: 'regulation', id: reg.id })} />
                   </Row>
                 </Stack>
               </CardBody>
@@ -2578,12 +2591,14 @@ function RegulationsView() {
           </div>
         ))}
       </Grid>
-      <Callout tone="info" title="Remote compliance">
-        При remote work применяются правила юрисдикции employer entity (EU/UK), не только страны проживания.
+      <Callout tone="info" title={cl === 'ru' ? 'Remote compliance' : 'Remote compliance'}>
+        {cl === 'ru'
+          ? 'При remote work применяются правила юрисдикции employer entity (EU/UK), не только страны проживания.'
+          : 'For remote work, employer entity jurisdiction rules (EU/UK) apply, not only country of residence.'}
       </Callout>
       <Table
-        headers={['Регион', 'Стран', 'Основной SAR', 'FIU']}
-        rows={REGIONS.filter((r) => r !== 'Все').map((reg) => {
+        headers={[tc(cl, 'regulationsRegion'), tc(cl, 'regulationsCountry'), 'SAR', 'FIU']}
+        rows={regions.filter((r) => r !== allLabel).map((reg) => {
           const items = REGULATIONS.filter((r) => r.region === reg);
           return [reg, String(items.length), items.map((i) => i.sarName).join(', '), items.map((i) => i.fiu).join('; ')];
         })}
@@ -3368,14 +3383,17 @@ function SoftwareCatalogView({ lang }: { lang: Lang }) {
   );
 }
 
-function CryptoVerificationView() {
+function CryptoVerificationView({ lang }: { lang: Lang }) {
+  const cl = contentLang(lang);
   const cryptoCaseCount = ALL_PRACTICE_CASES.filter((c) => c.category === 'crypto' || c.category === 'defi').length;
 
   return (
     <Stack gap={16}>
-      <H2>Crypto AML — 10 шагов проверки</H2>
+      <H2>{tc(cl, 'cryptoTitle')}</H2>
       <Text tone="secondary">
-        Полный workflow crypto compliance analyst: от VASP identification до SAR. {cryptoCaseCount} практических кейсов в полигоне (категории Crypto + DeFi).
+        {cl === 'ru'
+          ? `Полный workflow crypto compliance analyst: от VASP identification до SAR. ${cryptoCaseCount} практических кейсов в полигоне (категории Crypto + DeFi).`
+          : `Full crypto compliance workflow: VASP identification to SAR. ${cryptoCaseCount} practice cases in the polygon (Crypto + DeFi).`}
       </Text>
 
       <FlowDiagram
@@ -3386,10 +3404,10 @@ function CryptoVerificationView() {
       {CRYPTO_CHECKS.map((step) => (
         <div key={step.id}>
           <Card>
-          <CardHeader>Шаг {step.step}: {step.title}</CardHeader>
+          <CardHeader>{cl === 'ru' ? 'Шаг' : 'Step'} {step.step}: {step.title}</CardHeader>
           <CardBody>
             <Stack gap={10}>
-              <Text weight="medium">Действие аналитика</Text>
+              <Text weight="medium">{tc(cl, 'cryptoAction')}</Text>
               <Text>{step.action}</Text>
               <Text weight="medium">Инструменты</Text>
               <Row gap={6} wrap>
@@ -3401,7 +3419,7 @@ function CryptoVerificationView() {
               {step.redFlags.map((f) => (
                 <span key={f}><Text size="small">• {f}</Text></span>
               ))}
-              <Callout tone="warning" title="Совет аналитику">{step.analystTip}</Callout>
+              <Callout tone="warning" title={tc(cl, 'cryptoTip')}>{step.analystTip}</Callout>
             </Stack>
           </CardBody>
           </Card>
@@ -3416,13 +3434,13 @@ function ModuleView({ moduleId, lang, onNavigate, track = 'aml' }: {
   moduleId: string; lang: Lang; onNavigate: (view: string) => void; track?: 'aml' | 'osint';
 }) {
   const theme = useHostTheme();
-  const modules = track === 'osint' ? OSINT_MODULES : MODULES;
-  const metaMap = track === 'osint' ? OSINT_MODULE_META : MODULE_META;
+  const modules = track === 'osint' ? OSINT_MODULES : getCourseModules(contentLang(lang));
+  const metaMap = track === 'osint' ? OSINT_MODULE_META : getCourseModuleMeta(contentLang(lang));
   const passedKey = track === 'osint' ? 'passed-osint-modules' : 'passed-modules';
   const getMeta = track === 'osint' ? getOsintModuleMeta : getModuleMeta;
 
   const mod = modules.find((m) => m.id === moduleId)!;
-  const meta = getMeta(lang, mod);
+  const meta = track === 'aml' ? { title: mod.title, subtitle: mod.subtitle } : getMeta(lang, mod);
   const modMeta = metaMap[moduleId];
   const courseMod = track === 'aml' ? (mod as CourseModule) : null;
   const practiceTasks = courseMod?.practiceTasks ?? [];
@@ -3784,9 +3802,10 @@ function InterviewTrainerView({ lang }: { lang: Lang }) {
   );
 }
 
-function CourseFooterNav({ lang, view, onNavigate, passedModules, passedOsint, allModulesPassed, allOsintPassed }: {
+function CourseFooterNav({ lang, view, onNavigate, passedModules, passedOsint, allModulesPassed, allOsintPassed, courseModules }: {
   lang: Lang; view: string; onNavigate: (v: string) => void;
   passedModules: string[]; passedOsint: string[]; allModulesPassed: boolean; allOsintPassed: boolean;
+  courseModules: CourseModule[];
 }) {
   const theme = useHostTheme();
   const btn = (v: string, label: string) => (
@@ -3802,11 +3821,14 @@ function CourseFooterNav({ lang, view, onNavigate, passedModules, passedOsint, a
           <Text size="small" weight="medium">{t(lang, 'footerAml')}</Text>
           <Row gap={6} wrap>
             {btn('home', t(lang, 'navHome'))}
+            {btn('literature', t(lang, 'navLiterature'))}
+            {btn('trainers', t(lang, 'navTrainers'))}
+            {btn('news', t(lang, 'navNews'))}
             {btn('my-progress', t(lang, 'navMyProgress'))}
-            {MODULES.slice(0, 4).map((m) => <span key={m.id}>{btn(m.id, m.id.toUpperCase())}</span>)}
+            {courseModules.slice(0, 4).map((m) => <span key={m.id}>{btn(m.id, m.id.toUpperCase())}</span>)}
           </Row>
           <Row gap={6} wrap>
-            {MODULES.slice(4).map((m) => <span key={m.id}>{btn(m.id, m.id.toUpperCase())}</span>)}
+            {courseModules.slice(4).map((m) => <span key={m.id}>{btn(m.id, m.id.toUpperCase())}</span>)}
             {allModulesPassed && btn('final-exam', t(lang, 'finalExamTitle'))}
           </Row>
         </Stack>
@@ -3876,12 +3898,22 @@ export default function AmlKycTraining() {
   const [passedOsint] = useCanvasState<string[]>('passed-osint-modules', []);
   const [certified] = useCanvasState('final-certified', false);
   const [osintCertified] = useCanvasState('osint-certified', false);
-  const allModulesPassed = MODULES.every((m) => passedModules.includes(m.id));
+  const cl = contentLang(lang);
+  const courseModules = useMemo(() => getCourseModules(cl), [cl]);
+  const allModulesPassed = courseModules.every((m) => passedModules.includes(m.id));
   const allOsintPassed = OSINT_MODULES.every((m) => passedOsint.includes(m.id));
+
+  useEffect(() => {
+    document.documentElement.lang = lang === 'uk' ? 'uk' : lang;
+    document.title = `${getCourseTitle(cl)} — AML/KYC Academy`;
+  }, [lang, cl]);
 
   const navOptions = [
     { value: 'home', label: t(lang, 'navHome') },
     { value: 'my-progress', label: t(lang, 'navMyProgress') },
+    { value: 'literature', label: t(lang, 'navLiterature') },
+    { value: 'trainers', label: t(lang, 'navTrainers') },
+    { value: 'news', label: t(lang, 'navNews') },
     { value: 'osint-home', label: t(lang, 'navOsintTrack') },
     { value: 'interview-trainer', label: t(lang, 'navInterview') },
     { value: 'polygone', label: `${t(lang, 'navPolygone')} (${PRACTICE_CASES.length})` },
@@ -3899,16 +3931,20 @@ export default function AmlKycTraining() {
   return (
     <div className="app-shell">
       <header className="app-header">
-        <Row gap={16} align="center" wrap>
+        <div className="header-row">
           <Stack gap={4} style={{ flex: 1 }}>
-            <Text size="small" tone="secondary" weight="medium">AML/KYC ACADEMY</Text>
-            <H1 style={{ fontSize: 22 }}>{t(lang, 'appTitle')}</H1>
+            <Text size="small" tone="secondary" weight="medium">{tc(cl, 'brand')}</Text>
+            <H1 style={{ fontSize: 22 }}>{getCourseTitle(cl)}</H1>
+            <Text size="small" tone="secondary">{getCourseSubtitle(cl)}</Text>
           </Stack>
-          <Stack gap={4}>
-            <Text size="small" tone="secondary">{t(lang, 'langLabel')}</Text>
-            <Select value={lang} onChange={(v) => setLang(v as Lang)} options={LANG_OPTIONS} />
-          </Stack>
-        </Row>
+          <div className="lang-auth-row">
+            <Stack gap={4}>
+              <Text size="small" tone="secondary">{t(lang, 'langLabel')}</Text>
+              <Select value={lang} onChange={(v) => setLang(v as Lang)} options={LANG_OPTIONS} />
+            </Stack>
+            <AuthHeaderButton lang={lang} onOpenCabinet={() => setView('my-progress')} />
+          </div>
+        </div>
       </header>
 
       <Stack gap={20}>
@@ -3919,11 +3955,12 @@ export default function AmlKycTraining() {
           passedCount={passedModules.length}
           certified={certified}
           onOpenFinal={() => setView('final-exam')}
+          moduleCount={courseModules.length}
         />
       </div>
 
       <div className="stats-grid">
-        <Stat value={`${passedModules.length}/${MODULES.length}`} label={t(lang, 'modulesPassed')} tone={allModulesPassed ? 'success' : 'info'} />
+        <Stat value={`${passedModules.length}/${courseModules.length}`} label={t(lang, 'modulesPassed')} tone={allModulesPassed ? 'success' : 'info'} />
         <Stat value={`${passedOsint.length}/${OSINT_MODULES.length}`} label={t(lang, 'osintModulesPassed')} tone={allOsintPassed ? 'success' : 'info'} />
         <Stat value="50" label={t(lang, 'navOsintCases')} tone="info" />
         <Stat value={String(PRACTICE_CASES.length)} label={t(lang, 'casesCount')} tone="info" />
@@ -3938,8 +3975,8 @@ export default function AmlKycTraining() {
         <Stack gap={16}>
           <Callout tone="info" title={t(lang, 'howToPass')}>{t(lang, 'examUnlockBody')}</Callout>
 
-          <H2>{lang === 'ru' ? 'Путь обучения' : 'Learning path'}</H2>
-          <ModulePathGrid lang={lang} passedModules={passedModules} currentView={view} onSelect={setView} modules={MODULES} getMeta={getModuleMeta} />
+          <H2>{tc(cl, 'learningPath')}</H2>
+          <ModulePathGrid lang={lang} passedModules={passedModules} currentView={view} onSelect={setView} modules={courseModules} getMeta={getModuleMeta} />
 
           <H2>{t(lang, 'careerMap')}</H2>
           <Table
@@ -4004,69 +4041,42 @@ export default function AmlKycTraining() {
 
       {view === 'interview-trainer' && <InterviewTrainerView lang={lang} />}
 
-      {MODULES.some((m) => m.id === view) && <ModuleView moduleId={view} lang={lang} onNavigate={setView} />}
+      {courseModules.some((m) => m.id === view) && <ModuleView moduleId={view} lang={lang} onNavigate={setView} />}
+
+      {view === 'literature' && <LiteratureView lang={lang} />}
+      {view === 'trainers' && <TrainersView lang={lang} onNavigate={setView} />}
+      {view === 'news' && <NewsView lang={lang} />}
 
       {view === 'final-exam' && <FinalExamView lang={lang} />}
 
-      {view === 'glossary' && <GlossaryView filterCategory="all" />}
+      {view === 'glossary' && <GlossaryView filterCategory="all" lang={lang} />}
 
-      {view === 'regulations' && <RegulationsView />}
+      {view === 'regulations' && <RegulationsView lang={lang} />}
 
       {view === 'english' && <EnglishView />}
 
       {view === 'polygone' && <CaseLibraryView lang={lang} />}
 
-      {view === 'crypto-checks' && <CryptoVerificationView />}
+      {view === 'crypto-checks' && <CryptoVerificationView lang={lang} />}
 
       {view === 'software' && <SoftwareCatalogView lang={lang} />}
 
-      {view === 'resources' && (
-        <Stack gap={16}>
-          <H2>Библиотека специалиста AML/KYC/OSINT</H2>
-          <Text tone="secondary">Must-read: нормативка, сертификации, OSINT, crypto и практические manuals.</Text>
-          <Table
-            headers={['Название', 'Автор / источник', 'Тип', 'Зачем']}
-            rows={PROFESSIONAL_LITERATURE.map((b) => [
-              b.url ? <Link href={b.url}>{b.title}</Link> : b.title,
-              b.author,
-              b.type,
-              b.why,
-            ])}
-          />
-          <H2>Сертификация и тренажёры</H2>
-          <Table
-            headers={['Ресурс', 'Тип', 'Зачем']}
-            rows={[
-              ['ACAMS (CAMS)', 'Сертификация', 'Industry gold standard — многие работодатели оплачивают'],
-              ['ICA Diplomas', 'Сертификация', 'Альтернатива ACAMS'],
-              ['Chainalysis Reactor', 'Тренажёр', 'Crypto tracing — как OSINT на blockchain'],
-              ['OpenSanctions.org', 'Тренажёр', 'Практика sanctions screening'],
-              ['OpenCorporates', 'Тренажёр', 'UBO и корпоративные структуры'],
-              ['FATF Recommendations', 'Документы', '40 рекомендаций — основа AML'],
-              ['FinCEN SAR Review', 'Документы', 'Реальные примеры SAR'],
-              ['Bellingcat OSINT', 'OSINT', 'Навыки для EDD'],
-            ]}
-          />
-          <Callout tone="info" title="4-недельный план">
-            Нед 1: М1–М2 + FATF · Нед 2: М3–М4 + OpenSanctions · Нед 3: М5–М6 + OSINT · Нед 4: М7–М8 + кейсы + отчёт
-          </Callout>
-        </Stack>
-      )}
+      {view === 'resources' && <ResourcesHubView lang={lang} onNavigate={setView} />}
 
-      <CourseFooterNav lang={lang} view={view} onNavigate={setView} passedModules={passedModules} passedOsint={passedOsint} allModulesPassed={allModulesPassed} allOsintPassed={allOsintPassed} />
+      <CourseFooterNav lang={lang} view={view} onNavigate={setView} passedModules={passedModules} passedOsint={passedOsint} allModulesPassed={allModulesPassed} allOsintPassed={allOsintPassed} courseModules={courseModules} />
 
       <nav className="mobile-nav" aria-label="Mobile navigation">
         {[
           { id: 'home', label: 'AML' },
-          { id: 'my-progress', label: lang === 'ru' ? 'Отчёт' : 'Report' },
-          { id: 'osint-home', label: 'OSINT' },
+          { id: 'my-progress', label: tc(cl, 'navMyProgress').slice(0, 6) },
+          { id: 'news', label: tc(cl, 'navNews').slice(0, 5) },
           { id: 'polygone', label: 'Cases' },
-          { id: 'resources', label: 'Books' },
+          { id: 'literature', label: tc(cl, 'navLiterature').slice(0, 5) },
         ].map((item) => (
           <button
             key={item.id}
             type="button"
-            className={view === item.id || (item.id === 'home' && MODULES.some((m) => m.id === view)) ? 'active' : ''}
+            className={view === item.id || (item.id === 'home' && courseModules.some((m) => m.id === view)) ? 'active' : ''}
             onClick={() => setView(item.id)}
           >
             {item.label}
