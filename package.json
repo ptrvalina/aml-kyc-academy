@@ -5,8 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:full": "vite",
     "build": "tsc --noEmit && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "server": "npm run dev --prefix server",
+    "server:install": "npm install --prefix server"
   },
   "dependencies": {
     "react": "^19.0.0",

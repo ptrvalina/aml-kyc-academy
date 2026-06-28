@@ -66,6 +66,7 @@ const RU: Strings = {
   cryptoAction: 'Действие аналитика',
   cryptoTip: 'Совет аналитику',
   resourcesHub: 'Центр ресурсов',
+  navMore: 'Ещё',
   allLevels: 'Все уровни',
   filterCategory: 'Категория',
 };
@@ -134,6 +135,7 @@ const EN: Strings = {
   cryptoAction: 'Analyst action',
   cryptoTip: 'Analyst tip',
   resourcesHub: 'Resources hub',
+  navMore: 'More',
   allLevels: 'All levels',
   filterCategory: 'Category',
 };

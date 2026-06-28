@@ -1,6 +1,8 @@
 import { COURSE_MODULES, COURSE_MODULE_META, COURSE_TITLE, COURSE_SUBTITLE } from './course-modules';
 import type { CourseModule } from './course-modules';
 import type { ContentLang } from '../i18n/types';
+import { localizeExam } from './exams-i18n';
+import { localizePracticeTasks } from './practice-tasks-i18n';
 
 export const COURSE_TITLE_EN = 'AML/KYC Analyst: From Theory to Practice';
 export const COURSE_SUBTITLE_EN = '8 modules · 10–12 hours · tests · cases · progress report';
@@ -85,6 +87,8 @@ function localizeModule(mod: CourseModule): CourseModule {
         ? `### ${meta.title}\n\n${summaries[i]}`
         : '### Lesson\n\nStudy materials align with FATF and industry AML practice.',
     })),
+    exam: localizeExam(mod.exam, 'en'),
+    practiceTasks: localizePracticeTasks(mod.practiceTasks, 'en'),
   };
 }
 

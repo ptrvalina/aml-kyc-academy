@@ -25,6 +25,8 @@ function authErrorText(code: string, cl: 'ru' | 'en'): string {
     weak_password: 'authErrorWeakPassword',
     email_taken: 'authErrorEmailTaken',
     invalid_credentials: 'authErrorCredentials',
+    network_error: 'authErrorCredentials',
+    register_failed: 'authErrorCredentials',
   };
   const key = map[code];
   return key ? tc(cl, key) : code;
@@ -38,30 +40,36 @@ export function AuthPanel({ lang, onSuccess }: { lang: Lang; onSuccess?: () => v
   const [fullName, setFullName] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [loading, setLoading] = useState(false);
   const [, setSessionTick] = useCanvasState('auth-session-tick', 0);
 
   const user = getSessionUser();
 
-  const submit = () => {
+  const submit = async () => {
     setError('');
     setSuccess('');
-    if (mode === 'register') {
-      const res = registerUser({ email, fullName, password });
-      if (!res.ok) {
-        setError(authErrorText(res.error, cl));
-        return;
+    setLoading(true);
+    try {
+      if (mode === 'register') {
+        const res = await registerUser({ email, fullName, password });
+        if (!res.ok) {
+          setError(authErrorText(res.error, cl));
+          return;
+        }
+        setSuccess(tc(cl, 'authSuccessRegister'));
+        setSessionTick((n) => n + 1);
+        onSuccess?.();
+      } else {
+        const res = await loginUser(email, password);
+        if (!res.ok) {
+          setError(authErrorText(res.error, cl));
+          return;
+        }
+        setSessionTick((n) => n + 1);
+        onSuccess?.();
       }
-      setSuccess(tc(cl, 'authSuccessRegister'));
-      setSessionTick((n) => n + 1);
-      onSuccess?.();
-    } else {
-      const res = loginUser(email, password);
-      if (!res.ok) {
-        setError(authErrorText(res.error, cl));
-        return;
-      }
-      setSessionTick((n) => n + 1);
-      onSuccess?.();
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -102,8 +110,8 @@ export function AuthPanel({ lang, onSuccess }: { lang: Lang; onSuccess?: () => v
           </Stack>
           {error && <Callout tone="danger">{error}</Callout>}
           {success && <Callout tone="success">{success}</Callout>}
-          <Button variant="primary" onClick={submit}>
-            {mode === 'login' ? tc(cl, 'authLoginBtn') : tc(cl, 'authRegisterBtn')}
+          <Button variant="primary" onClick={submit} disabled={loading}>
+            {loading ? (cl === 'ru' ? 'Загрузка…' : 'Loading…') : mode === 'login' ? tc(cl, 'authLoginBtn') : tc(cl, 'authRegisterBtn')}
           </Button>
           <Text size="small" tone="secondary">
             {mode === 'login' ? tc(cl, 'authNoAccount') : tc(cl, 'authHasAccount')}{' '}

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Button,
   Callout,
@@ -21,7 +21,8 @@ import { contentLang } from '../i18n/types';
 import { tc, getCategoryLabels } from '../i18n/content-strings';
 import { getLiterature } from '../i18n/literature';
 import { getTrainers, TRAINER_CATEGORY_LABELS } from '../i18n/trainers';
-import { getNews } from '../i18n/news';
+import { getNews, type NewsItem } from '../i18n/news';
+import { api, isApiEnabled } from '../lib/api';
 
 export function LiteratureView({ lang }: { lang: Lang }) {
   const cl = contentLang(lang);
@@ -181,8 +182,41 @@ function NewsQuiz({ item, cl }: { item: ReturnType<typeof getNews>[0]; cl: 'ru' 
 
 export function NewsView({ lang }: { lang: Lang }) {
   const cl = contentLang(lang);
-  const items = getNews(cl);
+  const staticItems = getNews(cl);
+  const [apiItems, setApiItems] = useState<NewsItem[] | null>(null);
   const [region, setRegion] = useState('all');
+
+  useEffect(() => {
+    if (!isApiEnabled()) {
+      setApiItems(null);
+      return;
+    }
+    void api
+      .news(cl)
+      .then((res) => {
+        setApiItems(
+          res.items.map((item) => ({
+            id: `api-${item.id}`,
+            date: item.date,
+            region: item.tag,
+            title: item.title,
+            summary: item.summary,
+            impact: item.body,
+            url: '',
+            tags: [item.tag],
+            quiz: item.quiz
+              ? { question: item.quiz.question, options: item.quiz.options, correct: item.quiz.correctIndex }
+              : undefined,
+          })),
+        );
+      })
+      .catch(() => setApiItems(null));
+  }, [cl]);
+
+  const items = useMemo(
+    () => (apiItems?.length ? [...apiItems, ...staticItems] : staticItems),
+    [apiItems, staticItems],
+  );
 
   const regions = useMemo(() => ['all', ...Array.from(new Set(items.map((n) => n.region)))], [items]);
   const filtered = useMemo(
@@ -224,7 +258,7 @@ export function NewsView({ lang }: { lang: Lang }) {
                   ))}
                 </Row>
                 <NewsQuiz item={item} cl={cl} />
-                <Link href={item.url}>{tc(cl, 'newsReadMore')} →</Link>
+                {item.url ? <Link href={item.url}>{tc(cl, 'newsReadMore')} →</Link> : null}
               </Stack>
             </CardBody>
           </Card>

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, type ReactNode } from 'react';
+import { useEffect, useMemo, useCallback, type ReactNode } from 'react';
 import {
   Button,
   Callout,
@@ -33,8 +33,15 @@ import { getCourseModules, getCourseModuleMeta, getCourseTitle, getCourseSubtitl
 import { PracticeTasksPanel, StudentCabinetView } from './components/StudentCabinet';
 import { LiteratureView, TrainersView, NewsView, ResourcesHubView } from './components/ContentViews';
 import { AuthHeaderButton } from './components/AuthPanel';
-import { contentLang } from './i18n/types';
+import { AppNav, AppBreadcrumb } from './components/AppNav';
+import { resolveViewMeta, scrollToTop } from './lib/navigation';
+import { contentLang, type ContentLang, type Lang } from './i18n/types';
 import { tc, getCategoryLabels } from './i18n/content-strings';
+import { applyGlossaryLocale } from './data/glossary-i18n';
+import { CASE_SCENARIOS_EN } from './data/case-scenarios-en';
+import { refreshSession, scheduleProgressSync } from './lib/auth';
+import { getOsintModules, getOsintModuleMeta as getOsintModuleMetaContent, getOsintModuleTitle } from './data/osint-localized';
+import { localizeRegulations, localizeRegulation, getRegulationRegions } from './data/regulations-i18n';
 
 type SwatchColor = 'blue' | 'green' | 'purple' | 'orange' | 'pink' | 'yellow' | 'gray';
 type TermCategory = 'basics' | 'screening' | 'monitoring' | 'investigation' | 'redflags' | 'systems';
@@ -191,8 +198,6 @@ const CASE_CATEGORY_LABELS: Record<CaseCategory, string> = {
   wire: 'Wire / Cross-border',
   defi: 'DeFi / Web3',
 };
-
-type Lang = 'ru' | 'en' | 'lt' | 'uk' | 'pl' | 'de' | 'fr' | 'es' | 'it' | 'pt';
 
 const LANG_OPTIONS: Array<{ value: Lang; label: string }> = [
   { value: 'ru', label: 'Русский' },
@@ -637,9 +642,9 @@ const TERM_ENRICHMENTS: Record<string, { detail: string; english: string }> = {
   kyt: { detail: 'KYT = crypto equivalent of TM. Real-time screening on deposit/withdrawal. Integrates with onboarding and fraud. Analyst reviews KYT alerts same as TM alerts: context, trace, decision.', english: 'Know Your Transaction — monitoring and screening of cryptocurrency transactions.' },
 };
 
-function enrichedTerm(term: Term) {
+function enrichedTerm(term: Term, cl: ContentLang) {
   const e = TERM_ENRICHMENTS[term.id];
-  return { ...term, detail: term.detail ?? e?.detail ?? term.simple, english: term.english ?? e?.english ?? term.full };
+  return applyGlossaryLocale(term, cl, e);
 }
 
 const REGULATIONS: Regulation[] = [
@@ -1459,14 +1464,16 @@ function getPoolVariantIndex(pc: PracticeCase): number {
 }
 
 function getLocalizedCase(pc: PracticeCase, lang: Lang): { title: string; scenario: string; tasks: string[] } {
-  if (lang === 'ru') return { title: pc.title, scenario: pc.scenario, tasks: pc.tasks };
+  const cl = contentLang(lang);
+  if (cl === 'ru') return { title: pc.title, scenario: pc.scenario, tasks: pc.tasks };
   const featured = FEATURED_CASE_I18N[pc.id];
   if (featured) return featured;
   const vi = getPoolVariantIndex(pc);
   const pool = CASE_POOLS[pc.category];
   const sIdx = vi % pool.scenarios.length;
   const tIdx = vi % pool.taskSets.length;
-  const scenario = pool.scenarios[sIdx];
+  const enScenarios = CASE_SCENARIOS_EN[pc.category];
+  const scenario = enScenarios?.[sIdx] ?? pool.scenarios[sIdx];
   return {
     title: `${CASE_CAT_I18N[lang][pc.category]} — ${t(lang, 'scenario')} ${sIdx + 1}`,
     scenario,
@@ -1621,15 +1628,15 @@ const SOFTWARE_EN: Record<string, { summary: string; detail: string; usedFor: st
 };
 
 function getSoftwareLocalized(sw: SoftwareProvider, lang: Lang): SoftwareProvider {
-  if (lang === 'ru') return sw;
+  if (contentLang(lang) === 'ru') return sw;
   const en = SOFTWARE_EN[sw.id];
   if (!en) return sw;
   return { ...sw, ...en };
 }
 
 function getSoftwareCategoryLabel(lang: Lang, cat: SoftwareProvider['category']): string {
-  const en = SOFTWARE_CATEGORY_LABELS[cat];
-  if (lang === 'ru') {
+  const cl = contentLang(lang);
+  if (cl === 'ru') {
     const ru: Record<SoftwareProvider['category'], string> = {
       tm: 'Transaction Monitoring', screening: 'Sanctions & PEP Screening', kyc: 'KYC / Верификация личности',
       crypto: 'Blockchain Analytics & Crypto AML', case: 'Case Management & Расследования', osint: 'OSINT & Adverse Media',
@@ -1637,7 +1644,7 @@ function getSoftwareCategoryLabel(lang: Lang, cat: SoftwareProvider['category'])
     };
     return ru[cat];
   }
-  return en;
+  return SOFTWARE_CATEGORY_LABELS[cat];
 }
 
 type CryptoCheckStep = {
@@ -1774,23 +1781,16 @@ const OSINT_MODULE_META: Record<string, { objectives: string[]; takeaways: strin
   o6: { objectives: ['Write EDD report', 'Executive summary', 'Escalation path'], takeaways: ['Fact vs inference separated', 'Recommendation upfront', 'Negative findings documented'], proTip: 'Пиши report для MLRO, который прочитает за 5 минут.' },
 };
 
-const OSINT_MODULE_I18N: Record<string, Record<string, { title: string; subtitle: string }>> = {
-  en: {
-    o1: { title: 'OSINT 1: Methodology & Ethics', subtitle: 'OPSEC, sources, chain of custody' },
-    o2: { title: 'OSINT 2: Search & Dorking', subtitle: 'Operators, archives, reverse search' },
-    o3: { title: 'OSINT 3: Corporate & UBO', subtitle: 'Registries, shells, ownership chains' },
-    o4: { title: 'OSINT 4: Adverse Media', subtitle: 'News tiers, weighting, local language' },
-    o5: { title: 'OSINT 5: People OSINT', subtitle: 'LinkedIn, social, lifestyle checks' },
-    o6: { title: 'OSINT 6: EDD Reports', subtitle: 'Structure, summary, handoff' },
-  },
-};
-
 function getOsintModuleMeta(lang: Lang, mod: Module): { title: string; subtitle: string } {
-  if (lang === 'ru') return { title: mod.title, subtitle: mod.subtitle };
-  return OSINT_MODULE_I18N.en?.[mod.id] ?? { title: mod.title, subtitle: mod.subtitle };
+  return getOsintModuleTitle(contentLang(lang), mod);
 }
 
-const OSINT_FINAL_THEORY_EXAM: ExamQuestion[] = OSINT_MODULES.flatMap((m) => m.exam).map((q, i) => ({ ...q, id: `osint-final-q${i + 1}` }));
+function buildOsintFinalExam(lang: Lang): ExamQuestion[] {
+  return getOsintModules(OSINT_MODULES, contentLang(lang))
+    .flatMap((m) => m.exam)
+    .map((q, i) => ({ ...q, id: `osint-final-q${i + 1}` }));
+}
+
 const OSINT_FINAL_PASS = 24;
 const OSINT_FINAL_PRACTICAL_IDS = ['osint-p-001', 'osint-p-010', 'osint-p-020', 'osint-p-030', 'osint-p-040', 'osint-p-050'];
 const OSINT_FINAL_PRACTICAL_PASS = 4;
@@ -1870,41 +1870,54 @@ function LessonProse({ body }: { body: string }) {
   );
 }
 
-function DetailPanel() {
-  const theme = useHostTheme();
+function DetailPanel({ lang }: { lang: Lang }) {
+  const cl = contentLang(lang);
+  const catLabels = getCategoryLabels(cl);
   const [panel, setPanel] = useCanvasState<DetailPanelState>('detail-panel', null);
   if (!panel) return null;
 
+  const wrap = (node: ReactNode) => (
+    <div className="detail-backdrop" onClick={() => setPanel(null)} role="presentation">
+      <div className="detail-sheet" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
+        {node}
+      </div>
+    </div>
+  );
+
   if (panel.kind === 'term') {
-    const term = enrichedTerm(GLOSSARY.find((t) => t.id === panel.id)!);
-    return (
+    const term = enrichedTerm(GLOSSARY.find((t) => t.id === panel.id)!, cl);
+    return wrap(
       <Card>
-        <CardHeader trailing={<Button variant="ghost" onClick={() => setPanel(null)}>Закрыть</Button>}>
+        <CardHeader trailing={<Button variant="ghost" onClick={() => setPanel(null)}>{cl === 'ru' ? 'Закрыть' : 'Close'}</Button>}>
           {term.abbr} — {term.full}
         </CardHeader>
         <CardBody>
           <Stack gap={12}>
-            <Pill tone="info" size="sm">{CATEGORY_LABELS[term.category]}</Pill>
-            <Text weight="medium">Кратко</Text>
+            <Pill tone="info" size="sm">{catLabels[term.category]}</Pill>
+            <Text weight="medium">{cl === 'ru' ? 'Кратко' : 'Summary'}</Text>
             <Text>{term.simple}</Text>
-            <Text weight="medium">Подробное описание</Text>
+            <Text weight="medium">{cl === 'ru' ? 'Подробное описание' : 'Full description'}</Text>
             <Text>{term.detail}</Text>
-            <Text weight="medium">Пример из практики</Text>
+            <Text weight="medium">{cl === 'ru' ? 'Пример из практики' : 'Practical example'}</Text>
             <Text tone="secondary">{term.example}</Text>
-            <Divider />
-            <Text weight="medium">Technical English</Text>
-            <Text>{term.english}</Text>
+            {cl === 'ru' && (
+              <>
+                <Divider />
+                <Text weight="medium">Technical English</Text>
+                <Text>{term.english}</Text>
+              </>
+            )}
           </Stack>
         </CardBody>
-      </Card>
+      </Card>,
     );
   }
 
   if (panel.kind === 'regulation') {
-    const reg = REGULATIONS.find((r) => r.id === panel.id)!;
-    return (
+    const reg = localizeRegulation(REGULATIONS.find((r) => r.id === panel.id)!, cl);
+    return wrap(
       <Card>
-        <CardHeader trailing={<Button variant="ghost" onClick={() => setPanel(null)}>Закрыть</Button>}>
+        <CardHeader trailing={<Button variant="ghost" onClick={() => setPanel(null)}>{cl === 'ru' ? 'Закрыть' : 'Close'}</Button>}>
           {reg.flag} {reg.country}: {reg.name}
         </CardHeader>
         <CardBody>
@@ -1914,18 +1927,18 @@ function DetailPanel() {
               <Pill tone="info" size="sm">{reg.authority}</Pill>
             </Row>
             <Text>{reg.summary}</Text>
-            <Text weight="medium">Полное описание</Text>
+            <Text weight="medium">{cl === 'ru' ? 'Полное описание' : 'Full description'}</Text>
             <Text>{reg.detail}</Text>
-            <Text weight="medium">Ключевые правила</Text>
+            <Text weight="medium">{cl === 'ru' ? 'Ключевые правила' : 'Key rules'}</Text>
             {reg.keyRules.map((rule) => (
               <span key={rule}><Text size="small">• {rule}</Text></span>
             ))}
             <Table
-              headers={['Параметр', 'Значение']}
+              headers={[cl === 'ru' ? 'Параметр' : 'Parameter', cl === 'ru' ? 'Значение' : 'Value']}
               rows={[
-                ['Отчёт о подозрении', reg.sarName],
-                ['FIU / регулятор', reg.fiu],
-                ['Регулятор', reg.authority],
+                [cl === 'ru' ? 'Отчёт о подозрении' : 'Suspicion report', reg.sarName],
+                [cl === 'ru' ? 'FIU / регулятор' : 'FIU / regulator', reg.fiu],
+                [cl === 'ru' ? 'Регулятор' : 'Authority', reg.authority],
               ]}
             />
             <Text weight="medium">English terms</Text>
@@ -1936,74 +1949,74 @@ function DetailPanel() {
             </Row>
           </Stack>
         </CardBody>
-      </Card>
+      </Card>,
     );
   }
 
   if (panel.kind === 'english') {
     const lesson = ENGLISH_LESSONS.find((l) => l.id === panel.id)!;
-    return (
+    return wrap(
       <Card>
-        <CardHeader trailing={<Button variant="ghost" onClick={() => setPanel(null)}>Закрыть</Button>}>
+        <CardHeader trailing={<Button variant="ghost" onClick={() => setPanel(null)}>{cl === 'ru' ? 'Закрыть' : 'Close'}</Button>}>
           English: {lesson.topic}
         </CardHeader>
         <CardBody>
           <Stack gap={12}>
             <Pill tone="neutral" size="sm">{lesson.level}</Pill>
-            <Text weight="medium">Фразы для работы</Text>
+            <Text weight="medium">{cl === 'ru' ? 'Фразы для работы' : 'Work phrases'}</Text>
             {lesson.phrases.map((p) => (
-              <div key={p.en} style={{ padding: '8px 0', borderBottom: `1px solid ${theme.stroke.tertiary}` }}>
+              <div key={p.en} style={{ padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
                 <Row gap={8} align="center">
                   <Text weight="medium">{p.en}</Text>
                   <AudioButton text={p.en} label="▶" />
                 </Row>
                 <Text size="small" tone="secondary">{p.ru}</Text>
-                <Text size="small" tone="tertiary">Контекст: {p.context}</Text>
+                <Text size="small" tone="tertiary">{cl === 'ru' ? 'Контекст' : 'Context'}: {p.context}</Text>
               </div>
             ))}
-            <Text weight="medium">Словарь</Text>
+            <Text weight="medium">{cl === 'ru' ? 'Словарь' : 'Vocabulary'}</Text>
             <Table
               headers={['Term', 'Meaning', 'Example']}
               rows={lesson.vocabulary.map((v) => [v.term, v.meaning, v.example])}
             />
-            <Callout tone="info" title="Упражнение">{lesson.exercise}</Callout>
+            <Callout tone="info" title={cl === 'ru' ? 'Упражнение' : 'Exercise'}>{lesson.exercise}</Callout>
           </Stack>
         </CardBody>
-      </Card>
+      </Card>,
     );
   }
 
   if (panel.kind === 'software') {
-    const sw = SOFTWARE_PROVIDERS.find((s) => s.id === panel.id)!;
-    return (
+    const sw = getSoftwareLocalized(SOFTWARE_PROVIDERS.find((s) => s.id === panel.id)!, lang);
+    return wrap(
       <Card>
-        <CardHeader trailing={<Button variant="ghost" onClick={() => setPanel(null)}>Закрыть</Button>}>
+        <CardHeader trailing={<Button variant="ghost" onClick={() => setPanel(null)}>{cl === 'ru' ? 'Закрыть' : 'Close'}</Button>}>
           {sw.name}
         </CardHeader>
         <CardBody>
           <Stack gap={12}>
             <Row gap={8} wrap>
-              <Pill tone="info" size="sm">{SOFTWARE_CATEGORY_LABELS[sw.category]}</Pill>
+              <Pill tone="info" size="sm">{getSoftwareCategoryLabel(lang, sw.category)}</Pill>
               <Pill tone="neutral" size="sm">{sw.vendor}</Pill>
             </Row>
             <Text>{sw.summary}</Text>
-            <Text weight="medium">Подробное описание для сотрудника</Text>
+            <Text weight="medium">{cl === 'ru' ? 'Подробное описание для сотрудника' : 'Detailed description for analysts'}</Text>
             <Text>{sw.detail}</Text>
-            <Text weight="medium">Используется для</Text>
+            <Text weight="medium">{cl === 'ru' ? 'Используется для' : 'Used for'}</Text>
             {sw.usedFor.map((u) => (
               <span key={u}><Text size="small">• {u}</Text></span>
             ))}
             <Table
-              headers={['Параметр', 'Значение']}
+              headers={[cl === 'ru' ? 'Параметр' : 'Parameter', cl === 'ru' ? 'Значение' : 'Value']}
               rows={[
-                ['Типичные пользователи', sw.typicalUsers],
-                ['Категория', SOFTWARE_CATEGORY_LABELS[sw.category]],
-                ['Вендор', sw.vendor],
+                [cl === 'ru' ? 'Типичные пользователи' : 'Typical users', sw.typicalUsers],
+                [cl === 'ru' ? 'Категория' : 'Category', getSoftwareCategoryLabel(lang, sw.category)],
+                [cl === 'ru' ? 'Вендор' : 'Vendor', sw.vendor],
               ]}
             />
           </Stack>
         </CardBody>
-      </Card>
+      </Card>,
     );
   }
 
@@ -2060,45 +2073,91 @@ function FlowDiagram({ steps, edges }: { steps: Array<{ id: string; label: strin
   );
 }
 
-function CourseHero({ lang, passedCount, certified, onOpenFinal, moduleCount }: { lang: Lang; passedCount: number; certified: boolean; onOpenFinal: () => void; moduleCount: number }) {
-  const theme = useHostTheme();
-  const pct = Math.round((passedCount / moduleCount) * 100);
-  const allModules = passedCount === moduleCount;
+function CourseHero({
+  lang,
+  passedCount,
+  moduleCount,
+  osintPassed,
+  osintTotal,
+  certified,
+  osintCertified,
+  onOpenFinal,
+  onOpenOsintFinal,
+  allModulesPassed,
+  allOsintPassed,
+}: {
+  lang: Lang;
+  passedCount: number;
+  moduleCount: number;
+  osintPassed: number;
+  osintTotal: number;
+  certified: boolean;
+  osintCertified: boolean;
+  onOpenFinal: () => void;
+  onOpenOsintFinal: () => void;
+  allModulesPassed: boolean;
+  allOsintPassed: boolean;
+}) {
+  const cl = contentLang(lang);
+  const coursePct = moduleCount ? Math.round((passedCount / moduleCount) * 100) : 0;
+  const osintPct = osintTotal ? Math.round((osintPassed / osintTotal) * 100) : 0;
 
   return (
-    <div style={{ padding: 20, borderRadius: 8, border: `1px solid ${theme.stroke.primary}`, background: theme.fill.secondary }}>
-      <Stack gap={14}>
-        <Row gap={12} align="center" wrap>
-          <Stack gap={4} style={{ flex: 1 }}>
-            <Text size="small" tone="secondary" weight="medium">AML/KYC ACADEMY</Text>
-            <H2>{t(lang, 'appTitle')}</H2>
-            <Text tone="secondary">{t(lang, 'appSubtitle')}</Text>
-          </Stack>
-          {certified ? (
-            <Pill tone="success" size="sm">{t(lang, 'certified')}</Pill>
-          ) : (
-            <Pill tone="info" size="sm">{pct}%</Pill>
-          )}
-        </Row>
-        <UsageBar
-          segments={[
-            { id: 'done', value: passedCount, color: 'green' },
-            { id: 'left', value: Math.max(0, moduleCount - passedCount), color: 'gray' },
-          ]}
-          total={moduleCount}
-          topLeftLabel={t(lang, 'courseProgress')}
-          topRightLabel={`${passedCount}/${moduleCount}`}
-        />
-        {allModules && !certified && (
-          <Callout tone="success" title={t(lang, 'finalExamUnlocked')}>
-            <Button variant="primary" onClick={onOpenFinal}>{t(lang, 'finalExamTitle')} →</Button>
-          </Callout>
+    <Stack gap={16}>
+      <Row gap={12} align="center" wrap>
+        <Stack gap={4} style={{ flex: 1 }}>
+          <Text size="small" tone="secondary" weight="medium">{tc(cl, 'brand')}</Text>
+          <H2 style={{ margin: 0 }}>{t(lang, 'appTitle')}</H2>
+          <Text tone="secondary">{t(lang, 'appSubtitle')}</Text>
+        </Stack>
+        {(certified || osintCertified) && (
+          <Pill tone="success" size="sm">{t(lang, 'certified')}</Pill>
         )}
-        {certified && (
-          <Callout tone="success" title={t(lang, 'finalExamPass')}>{t(lang, 'jobReadyBody')}</Callout>
-        )}
-      </Stack>
-    </div>
+      </Row>
+
+      <div className="progress-dashboard">
+        <div className="progress-card">
+          <div className="progress-card__label">{t(lang, 'courseProgress')} · AML</div>
+          <div className="progress-card__bar">
+            <div
+              className={`progress-card__fill${coursePct === 100 ? ' progress-card__fill--success' : ''}`}
+              style={{ width: `${coursePct}%` }}
+            />
+          </div>
+          <Text size="small" tone="secondary" style={{ marginTop: 8 }}>{passedCount}/{moduleCount} · {coursePct}%</Text>
+        </div>
+        <div className="progress-card">
+          <div className="progress-card__label">{t(lang, 'navOsintTrack')}</div>
+          <div className="progress-card__bar">
+            <div
+              className={`progress-card__fill${osintPct === 100 ? ' progress-card__fill--success' : ''}`}
+              style={{ width: `${osintPct}%` }}
+            />
+          </div>
+          <Text size="small" tone="secondary" style={{ marginTop: 8 }}>{osintPassed}/{osintTotal} · {osintPct}%</Text>
+        </div>
+        <div className="progress-card">
+          <div className="progress-card__label">{t(lang, 'status')}</div>
+          <Text weight="medium" style={{ marginTop: 4 }}>
+            {certified && osintCertified
+              ? (cl === 'ru' ? 'Курс + OSINT завершены' : 'Course + OSINT complete')
+              : certified
+                ? (cl === 'ru' ? 'AML-сертификат получен' : 'AML certificate earned')
+                : osintCertified
+                  ? (cl === 'ru' ? 'OSINT-трек завершён' : 'OSINT track complete')
+                  : t(lang, 'statusStudy')}
+          </Text>
+          <Row gap={8} wrap style={{ marginTop: 10 }}>
+            {allModulesPassed && !certified && (
+              <Button variant="primary" onClick={onOpenFinal}>{t(lang, 'finalExamTitle')} →</Button>
+            )}
+            {allOsintPassed && !osintCertified && (
+              <Button variant="ghost" onClick={onOpenOsintFinal}>{t(lang, 'osintFinalExam')} →</Button>
+            )}
+          </Row>
+        </div>
+      </div>
+    </Stack>
   );
 }
 
@@ -2106,8 +2165,6 @@ function ModulePathGrid({ lang, passedModules, currentView, onSelect, modules, g
   lang: Lang; passedModules: string[]; currentView: string; onSelect: (id: string) => void;
   modules: Module[]; getMeta: (lang: Lang, mod: Module) => { title: string; subtitle: string };
 }) {
-  const theme = useHostTheme();
-
   return (
     <div className={`module-grid${modules.length <= 6 ? ' osint' : ''}`}>
       {modules.map((m, i) => {
@@ -2115,22 +2172,27 @@ function ModulePathGrid({ lang, passedModules, currentView, onSelect, modules, g
         const locked = i > 0 && !passedModules.includes(modules[i - 1].id);
         const active = currentView === m.id;
         const meta = getMeta(lang, m);
+        const shortTitle = meta.title
+          .replace(/^Modul[eы]? \d+: /i, '')
+          .replace(/^Module \d+: /i, '')
+          .replace(/^OSINT \d+: /i, '')
+          .slice(0, 36);
         return (
           <button
             key={m.id}
             type="button"
             disabled={locked}
+            className={[
+              'module-card',
+              active ? 'module-card--active' : '',
+              done ? 'module-card--done' : '',
+              locked ? 'module-card--locked' : '',
+            ].filter(Boolean).join(' ')}
             onClick={() => !locked && onSelect(m.id)}
-            style={{
-              padding: '12px 10px', textAlign: 'left', cursor: locked ? 'not-allowed' : 'pointer',
-              border: `1px solid ${active ? theme.accent.primary : theme.stroke.primary}`,
-              borderRadius: 6, background: active ? theme.fill.secondary : theme.bg.elevated,
-              opacity: locked ? 0.45 : 1,
-            }}
           >
-            <Text size="small" tone="secondary">{m.id.toUpperCase()}</Text>
-            <Text size="small" weight="medium">{meta.title.replace(/^Modul[eы]? \d+: /i, '').replace(/^OSINT \d+: /i, '').slice(0, 28)}</Text>
-            <div style={{ marginTop: 6 }}>
+            <span className="module-card__id">{m.id.toUpperCase()}</span>
+            <span className="module-card__title">{shortTitle}</span>
+            <div>
               {done && <Pill tone="success" size="sm">{t(lang, 'passed')}</Pill>}
               {locked && <Pill tone="neutral" size="sm">{t(lang, 'locked')}</Pill>}
               {!done && !locked && <Pill tone="info" size="sm">{t(lang, 'available')}</Pill>}
@@ -2143,7 +2205,6 @@ function ModulePathGrid({ lang, passedModules, currentView, onSelect, modules, g
 }
 
 function ModuleStepBar({ lang, tab, onTab, hasGlossary, hasPractice }: { lang: Lang; tab: string; onTab: (t: string) => void; hasGlossary: boolean; hasPractice: boolean }) {
-  const theme = useHostTheme();
   const steps = [
     { id: 'lesson', label: t(lang, 'stepLearn'), required: true },
     ...(hasGlossary ? [{ id: 'glossary', label: t(lang, 'stepGlossary'), required: false }] : []),
@@ -2152,26 +2213,20 @@ function ModuleStepBar({ lang, tab, onTab, hasGlossary, hasPractice }: { lang: L
   ];
 
   return (
-    <Row gap={6} wrap>
-      {steps.map((s, i) => {
-        const active = tab === s.id;
-        return (
-          <button
-            key={s.id}
-            type="button"
-            onClick={() => onTab(s.id)}
-            style={{
-              padding: '8px 14px', borderRadius: 20, cursor: 'pointer', border: 'none',
-              background: active ? theme.accent.primary : theme.fill.tertiary,
-              color: active ? theme.text.onAccent : theme.text.primary,
-              fontSize: 12, fontWeight: active ? 600 : 400, fontFamily: 'inherit',
-            }}
-          >
-            {i + 1}. {s.label}{!s.required ? ` (${t(lang, 'optional')})` : ''}
-          </button>
-        );
-      })}
-    </Row>
+    <div className="module-steps">
+      <Row gap={6} wrap>
+      {steps.map((s, i) => (
+        <button
+          key={s.id}
+          type="button"
+          className={`step-pill${tab === s.id ? ' step-pill--active' : ''}`}
+          onClick={() => onTab(s.id)}
+        >
+          {i + 1}. {s.label}{!s.required ? ` (${t(lang, 'optional')})` : ''}
+        </button>
+      ))}
+      </Row>
+    </div>
   );
 }
 
@@ -2510,7 +2565,7 @@ function GlossaryView({ filterCategory, lang }: { filterCategory?: TermCategory 
   const [readTerms, setReadTerms] = useCanvasState<string[]>('read-terms', []);
   const [, setPanel] = useCanvasState<DetailPanelState>('detail-panel', null);
   const [catFilter, setCatFilter] = useCanvasState<TermCategory | 'all'>('glossary-cat', filterCategory ?? 'all');
-  const terms = (catFilter === 'all' ? GLOSSARY : GLOSSARY.filter((t) => t.category === catFilter)).map(enrichedTerm);
+  const terms = (catFilter === 'all' ? GLOSSARY : GLOSSARY.filter((t) => t.category === catFilter)).map((t) => enrichedTerm(t, cl));
 
   return (
     <Stack gap={8}>
@@ -2562,8 +2617,13 @@ function RegulationsView({ lang }: { lang: Lang }) {
   const allLabel = cl === 'ru' ? 'Все' : 'All';
   const [, setPanel] = useCanvasState<DetailPanelState>('detail-panel', null);
   const [region, setRegion] = useCanvasState('reg-region', allLabel);
-  const filtered = region === allLabel ? REGULATIONS : REGULATIONS.filter((r) => r.region === region);
-  const regions = [allLabel, ...REGIONS.filter((r) => r !== 'Все' && r !== 'All')];
+  const localizedRegs = useMemo(() => localizeRegulations(REGULATIONS, cl), [cl]);
+  const regions = getRegulationRegions(cl);
+  const filtered = region === allLabel ? localizedRegs : localizedRegs.filter((r) => r.region === region);
+
+  useEffect(() => {
+    setRegion(allLabel);
+  }, [allLabel, setRegion]);
 
   return (
     <Stack gap={16}>
@@ -2598,9 +2658,9 @@ function RegulationsView({ lang }: { lang: Lang }) {
       </Callout>
       <Table
         headers={[tc(cl, 'regulationsRegion'), tc(cl, 'regulationsCountry'), 'SAR', 'FIU']}
-        rows={regions.filter((r) => r !== allLabel).map((reg) => {
-          const items = REGULATIONS.filter((r) => r.region === reg);
-          return [reg, String(items.length), items.map((i) => i.sarName).join(', '), items.map((i) => i.fiu).join('; ')];
+        rows={regions.filter((r) => r !== allLabel && r !== 'Все' && r !== 'All').map((regLabel) => {
+          const items = localizedRegs.filter((r) => r.region === regLabel);
+          return [regLabel, String(items.length), items.map((i) => i.sarName).join(', '), items.map((i) => i.fiu).join('; ')];
         })}
       />
     </Stack>
@@ -2720,22 +2780,23 @@ function EnglishView() {
   );
 }
 
-function ModuleGlossary({ termIds }: { termIds: string[] }) {
+function ModuleGlossary({ termIds, lang }: { termIds: string[]; lang: Lang }) {
+  const cl = contentLang(lang);
   const [, setPanel] = useCanvasState<DetailPanelState>('detail-panel', null);
   return (
     <Stack gap={8}>
       {termIds.map((tid) => {
-        const term = enrichedTerm(GLOSSARY.find((g) => g.id === tid)!);
+        const term = enrichedTerm(GLOSSARY.find((g) => g.id === tid)!, cl);
         return (
           <div key={tid}>
             <CollapsibleSection
               title={`${term.abbr} — ${term.full}`}
               leading={<Swatch color={term.color} />}
-              trailing={<DetailButton label="Подробнее" onClick={() => setPanel({ kind: 'term', id: term.id })} />}
+              trailing={<DetailButton label={cl === 'ru' ? 'Подробнее' : 'Details'} onClick={() => setPanel({ kind: 'term', id: term.id })} />}
             >
               <Stack gap={6} style={{ paddingLeft: 20 }}>
                 <Text>{term.simple}</Text>
-                <Text size="small" tone="secondary">Пример: {term.example}</Text>
+                <Text size="small" tone="secondary">{cl === 'ru' ? 'Пример' : 'Example'}: {term.example}</Text>
               </Stack>
             </CollapsibleSection>
           </div>
@@ -3434,8 +3495,13 @@ function ModuleView({ moduleId, lang, onNavigate, track = 'aml' }: {
   moduleId: string; lang: Lang; onNavigate: (view: string) => void; track?: 'aml' | 'osint';
 }) {
   const theme = useHostTheme();
-  const modules = track === 'osint' ? OSINT_MODULES : getCourseModules(contentLang(lang));
-  const metaMap = track === 'osint' ? OSINT_MODULE_META : getCourseModuleMeta(contentLang(lang));
+  const cl = contentLang(lang);
+  const modules = track === 'osint' ? getOsintModules(OSINT_MODULES, cl) : getCourseModules(cl);
+  const metaMap = track === 'osint'
+    ? Object.fromEntries(
+        Object.entries(OSINT_MODULE_META).map(([id, m]) => [id, getOsintModuleMetaContent(cl, id, m)]),
+      )
+    : getCourseModuleMeta(cl);
   const passedKey = track === 'osint' ? 'passed-osint-modules' : 'passed-modules';
   const getMeta = track === 'osint' ? getOsintModuleMeta : getModuleMeta;
 
@@ -3602,7 +3668,7 @@ function ModuleView({ moduleId, lang, onNavigate, track = 'aml' }: {
         </Stack>
       )}
 
-      {tab === 'glossary' && mod.termIds.length > 0 && <ModuleGlossary termIds={mod.termIds} />}
+      {tab === 'glossary' && mod.termIds.length > 0 && <ModuleGlossary termIds={mod.termIds} lang={lang} />}
 
       {tab === 'glossary' && mod.termIds.length === 0 && (
         <Text tone="secondary">{lang === 'ru' ? 'В этом модуле нет отдельных терминов — см. полный глоссарий.' : 'No module-specific terms — see full glossary.'}</Text>
@@ -3646,6 +3712,7 @@ function ModuleView({ moduleId, lang, onNavigate, track = 'aml' }: {
 
 function OsintFinalExamView({ lang }: { lang: Lang }) {
   const theme = useHostTheme();
+  const osintFinalExam = useMemo(() => buildOsintFinalExam(lang), [lang]);
   const [part, setPart] = useCanvasState('osint-final-part', 'theory');
   const [certified, setCertified] = useCanvasState('osint-certified', false);
   const [theoryPassed, setTheoryPassed] = useCanvasState('osint-theory-passed', false);
@@ -3684,7 +3751,7 @@ function OsintFinalExamView({ lang }: { lang: Lang }) {
         ))}
       </Row>
       {part === 'theory' && (
-        <ExamBlock moduleId="osint-final" exam={OSINT_FINAL_THEORY_EXAM} passScore={OSINT_FINAL_PASS} lang={lang}
+        <ExamBlock moduleId="osint-final" exam={osintFinalExam} passScore={OSINT_FINAL_PASS} lang={lang}
           onPass={() => { setTheoryPassed(true); tryCertify(true, practicalPassed.length); }}
           hideModulePassedCallout skipModuleUnlock forcedPassed={theoryPassed} passedKey="passed-osint-modules" />
       )}
@@ -3900,33 +3967,36 @@ export default function AmlKycTraining() {
   const [osintCertified] = useCanvasState('osint-certified', false);
   const cl = contentLang(lang);
   const courseModules = useMemo(() => getCourseModules(cl), [cl]);
+  const osintModules = useMemo(() => getOsintModules(OSINT_MODULES, cl), [cl]);
   const allModulesPassed = courseModules.every((m) => passedModules.includes(m.id));
-  const allOsintPassed = OSINT_MODULES.every((m) => passedOsint.includes(m.id));
+  const allOsintPassed = osintModules.every((m) => passedOsint.includes(m.id));
 
   useEffect(() => {
     document.documentElement.lang = lang === 'uk' ? 'uk' : lang;
     document.title = `${getCourseTitle(cl)} — AML/KYC Academy`;
   }, [lang, cl]);
 
-  const navOptions = [
-    { value: 'home', label: t(lang, 'navHome') },
-    { value: 'my-progress', label: t(lang, 'navMyProgress') },
-    { value: 'literature', label: t(lang, 'navLiterature') },
-    { value: 'trainers', label: t(lang, 'navTrainers') },
-    { value: 'news', label: t(lang, 'navNews') },
-    { value: 'osint-home', label: t(lang, 'navOsintTrack') },
-    { value: 'interview-trainer', label: t(lang, 'navInterview') },
-    { value: 'polygone', label: `${t(lang, 'navPolygone')} (${PRACTICE_CASES.length})` },
-    { value: 'osint-practice', label: t(lang, 'navOsintCases') },
-    ...(allModulesPassed ? [{ value: 'final-exam', label: t(lang, 'finalExamTitle') }] : []),
-    ...(allOsintPassed ? [{ value: 'osint-final-exam', label: t(lang, 'osintFinalExam') }] : []),
-    { value: 'glossary', label: `${t(lang, 'navGlossary')} (${GLOSSARY.length})` },
-    { value: 'regulations', label: `${t(lang, 'navRegulations')} (${REGULATIONS.length})` },
-    { value: 'english', label: `${t(lang, 'navEnglish')} (${ENGLISH_LESSONS.length})` },
-    { value: 'crypto-checks', label: `${t(lang, 'navCrypto')} (${t(lang, 'optional')})` },
-    { value: 'software', label: `${t(lang, 'navSoftware')} (${t(lang, 'optional')})` },
-    { value: 'resources', label: t(lang, 'navResources') },
-  ];
+  useEffect(() => {
+    void refreshSession();
+  }, []);
+
+  useEffect(() => {
+    scheduleProgressSync();
+  }, [passedModules, passedOsint, certified, osintCertified]);
+
+  const navigate = useCallback(
+    (next: string) => {
+      setView(next);
+      scrollToTop();
+    },
+    [setView],
+  );
+
+  const viewMeta = useMemo(
+    () =>
+      resolveViewMeta(view, lang, t as (l: Lang, k: string) => string, courseModules, osintModules, getModuleMeta, getOsintModuleMeta),
+    [view, lang, courseModules, osintModules],
+  );
 
   return (
     <div className="app-shell">
@@ -3942,7 +4012,7 @@ export default function AmlKycTraining() {
               <Text size="small" tone="secondary">{t(lang, 'langLabel')}</Text>
               <Select value={lang} onChange={(v) => setLang(v as Lang)} options={LANG_OPTIONS} />
             </Stack>
-            <AuthHeaderButton lang={lang} onOpenCabinet={() => setView('my-progress')} />
+            <AuthHeaderButton lang={lang} onOpenCabinet={() => navigate('my-progress')} />
           </div>
         </div>
       </header>
@@ -3953,30 +4023,48 @@ export default function AmlKycTraining() {
         <CourseHero
           lang={lang}
           passedCount={passedModules.length}
-          certified={certified}
-          onOpenFinal={() => setView('final-exam')}
           moduleCount={courseModules.length}
+          osintPassed={passedOsint.length}
+          osintTotal={osintModules.length}
+          certified={certified}
+          osintCertified={osintCertified}
+          allModulesPassed={allModulesPassed}
+          allOsintPassed={allOsintPassed}
+          onOpenFinal={() => navigate('final-exam')}
+          onOpenOsintFinal={() => navigate('osint-final-exam')}
         />
       </div>
 
       <div className="stats-grid">
         <Stat value={`${passedModules.length}/${courseModules.length}`} label={t(lang, 'modulesPassed')} tone={allModulesPassed ? 'success' : 'info'} />
-        <Stat value={`${passedOsint.length}/${OSINT_MODULES.length}`} label={t(lang, 'osintModulesPassed')} tone={allOsintPassed ? 'success' : 'info'} />
+        <Stat value={`${passedOsint.length}/${osintModules.length}`} label={t(lang, 'osintModulesPassed')} tone={allOsintPassed ? 'success' : 'info'} />
         <Stat value="50" label={t(lang, 'navOsintCases')} tone="info" />
         <Stat value={String(PRACTICE_CASES.length)} label={t(lang, 'casesCount')} tone="info" />
         <Stat value={certified || osintCertified ? t(lang, 'certified') : t(lang, 'statusStudy')} label={t(lang, 'status')} tone={certified ? 'success' : 'warning'} />
       </div>
 
-      <div className="desktop-only-select">
-        <Select value={view} onChange={setView} options={navOptions} />
-      </div>
+      <AppNav
+        lang={lang}
+        cl={cl}
+        view={view}
+        onNavigate={navigate}
+        t={t as (l: Lang, k: string) => string}
+        courseModules={courseModules}
+        osintModules={osintModules}
+        allModulesPassed={allModulesPassed}
+        allOsintPassed={allOsintPassed}
+      />
+
+      {view !== 'home' && (
+        <AppBreadcrumb meta={viewMeta} onNavigate={navigate} cl={cl} />
+      )}
 
       {view === 'home' && (
         <Stack gap={16}>
           <Callout tone="info" title={t(lang, 'howToPass')}>{t(lang, 'examUnlockBody')}</Callout>
 
           <H2>{tc(cl, 'learningPath')}</H2>
-          <ModulePathGrid lang={lang} passedModules={passedModules} currentView={view} onSelect={setView} modules={courseModules} getMeta={getModuleMeta} />
+          <ModulePathGrid lang={lang} passedModules={passedModules} currentView={view} onSelect={navigate} modules={courseModules} getMeta={getModuleMeta} />
 
           <H2>{t(lang, 'careerMap')}</H2>
           <Table
@@ -3993,7 +4081,7 @@ export default function AmlKycTraining() {
 
           {allModulesPassed && !certified && (
             <Callout tone="success" title={t(lang, 'finalExamUnlocked')}>
-              <Button variant="primary" onClick={() => setView('final-exam')}>{t(lang, 'finalExamTitle')} →</Button>
+              <Button variant="primary" onClick={() => navigate('final-exam')}>{t(lang, 'finalExamTitle')} →</Button>
             </Callout>
           )}
         </Stack>
@@ -4007,7 +4095,7 @@ export default function AmlKycTraining() {
           certified={certified}
           osintCertified={osintCertified}
           totalCases={PRACTICE_CASES.length}
-          osintModules={OSINT_MODULES.map((m) => ({
+          osintModules={osintModules.map((m) => ({
             id: m.id,
             title: m.title,
             passed: passedOsint.includes(m.id),
@@ -4021,17 +4109,17 @@ export default function AmlKycTraining() {
           <Callout tone="info" title={t(lang, 'howToPass')}>
             {lang === 'ru' ? '6 модулей OSINT: урок → тест (80%). После всех — финальный экзамен OSINT + 50 практических кейсов.' : '6 OSINT modules: lesson → test (80%). Then OSINT final exam + 50 practice cases.'}
           </Callout>
-          <ModulePathGrid lang={lang} passedModules={passedOsint} currentView={view} onSelect={setView} modules={OSINT_MODULES} getMeta={getOsintModuleMeta} />
+          <ModulePathGrid lang={lang} passedModules={passedOsint} currentView={view} onSelect={navigate} modules={osintModules} getMeta={getOsintModuleMeta} />
           <Row gap={8} wrap>
-            <Button variant="primary" onClick={() => setView('osint-practice')}>{t(lang, 'navOsintCases')} (50)</Button>
+            <Button variant="primary" onClick={() => navigate('osint-practice')}>{t(lang, 'navOsintCases')} (50)</Button>
             {allOsintPassed && !osintCertified && (
-              <Button variant="ghost" onClick={() => setView('osint-final-exam')}>{t(lang, 'osintFinalExam')} →</Button>
+              <Button variant="ghost" onClick={() => navigate('osint-final-exam')}>{t(lang, 'osintFinalExam')} →</Button>
             )}
           </Row>
         </Stack>
       )}
 
-      {OSINT_MODULES.some((m) => m.id === view) && <ModuleView moduleId={view} lang={lang} onNavigate={setView} track="osint" />}
+      {OSINT_MODULES.some((m) => m.id === view) && <ModuleView moduleId={view} lang={lang} onNavigate={navigate} track="osint" />}
 
       {view === 'osint-final-exam' && <OsintFinalExamView lang={lang} />}
 
@@ -4041,10 +4129,10 @@ export default function AmlKycTraining() {
 
       {view === 'interview-trainer' && <InterviewTrainerView lang={lang} />}
 
-      {courseModules.some((m) => m.id === view) && <ModuleView moduleId={view} lang={lang} onNavigate={setView} />}
+      {courseModules.some((m) => m.id === view) && <ModuleView moduleId={view} lang={lang} onNavigate={navigate} />}
 
       {view === 'literature' && <LiteratureView lang={lang} />}
-      {view === 'trainers' && <TrainersView lang={lang} onNavigate={setView} />}
+      {view === 'trainers' && <TrainersView lang={lang} onNavigate={navigate} />}
       {view === 'news' && <NewsView lang={lang} />}
 
       {view === 'final-exam' && <FinalExamView lang={lang} />}
@@ -4061,30 +4149,36 @@ export default function AmlKycTraining() {
 
       {view === 'software' && <SoftwareCatalogView lang={lang} />}
 
-      {view === 'resources' && <ResourcesHubView lang={lang} onNavigate={setView} />}
+      {view === 'resources' && <ResourcesHubView lang={lang} onNavigate={navigate} />}
 
-      <CourseFooterNav lang={lang} view={view} onNavigate={setView} passedModules={passedModules} passedOsint={passedOsint} allModulesPassed={allModulesPassed} allOsintPassed={allOsintPassed} courseModules={courseModules} />
+      <CourseFooterNav lang={lang} view={view} onNavigate={navigate} passedModules={passedModules} passedOsint={passedOsint} allModulesPassed={allModulesPassed} allOsintPassed={allOsintPassed} courseModules={courseModules} />
 
       <nav className="mobile-nav" aria-label="Mobile navigation">
         {[
-          { id: 'home', label: 'AML' },
-          { id: 'my-progress', label: tc(cl, 'navMyProgress').slice(0, 6) },
-          { id: 'news', label: tc(cl, 'navNews').slice(0, 5) },
+          { id: 'home', label: t(lang, 'navHome').slice(0, 8) },
+          { id: 'my-progress', label: t(lang, 'navMyProgress').slice(0, 8) },
+          { id: 'news', label: t(lang, 'navNews').slice(0, 8) },
           { id: 'polygone', label: 'Cases' },
-          { id: 'literature', label: tc(cl, 'navLiterature').slice(0, 5) },
+          { id: 'osint-home', label: 'OSINT' },
         ].map((item) => (
           <button
             key={item.id}
             type="button"
-            className={view === item.id || (item.id === 'home' && courseModules.some((m) => m.id === view)) ? 'active' : ''}
-            onClick={() => setView(item.id)}
+            className={
+              view === item.id
+              || (item.id === 'home' && courseModules.some((m) => m.id === view))
+              || (item.id === 'osint-home' && (osintModules.some((m) => m.id === view) || view.startsWith('osint')))
+                ? 'active'
+                : ''
+            }
+            onClick={() => navigate(item.id)}
           >
             {item.label}
           </button>
         ))}
       </nav>
 
-      <DetailPanel />
+      <DetailPanel lang={lang} />
       </Stack>
     </div>
   );
