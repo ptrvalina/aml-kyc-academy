@@ -1,10 +1,11 @@
-# Cursor canvas runtime state (local only)
-*.canvas.data.json
-*.canvas.status.json
-
-# OS / editor
+node_modules/
+dist/
+*.log
 .DS_Store
 Thumbs.db
-.idea/
-.vscode/
-*.log
+.commitmsg
+commit_out.txt
+push_out.txt
+push2.txt
+push_log.txt
+git-status.txt

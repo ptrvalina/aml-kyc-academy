@@ -1,51 +1,53 @@
 # AML/KYC Academy
 
-Интерактивный учебный курс **AML/KYC Compliance + OSINT** для подготовки к роли Financial Crime Analyst.
+Интерактивный учебный курс **AML/KYC Compliance + OSINT** — полностью в браузере, без установки.
+
+**Сайт:** [https://ptrvalina.github.io/aml-kyc-academy/](https://ptrvalina.github.io/aml-kyc-academy/)
 
 **Репозиторий:** [github.com/ptrvalina/aml-kyc-academy](https://github.com/ptrvalina/aml-kyc-academy)
-
-**Публичная страница (GitHub Pages):**  
-[https://ptrvalina.github.io/aml-kyc-academy/](https://ptrvalina.github.io/aml-kyc-academy/)
 
 ## Что внутри
 
 | Трек | Содержание |
 |------|------------|
-| **AML** | 14 модулей → тест после каждого (80%) → финальный экзамен (40 теория + 10 практика) |
-| **OSINT** | 6 модулей → тест → финальный экзамен + **50 практических кейсов** |
-| **Практика** | 300+ кейсов в Case Manager, English-модуль, Crypto AML |
+| **AML** | 14 модулей → тест (80%) → финальный экзамен (40 теория + 10 практика) |
+| **OSINT** | 6 модулей → финальный экзамен + **50 практических кейсов** |
+| **Практика** | 300+ кейсов, English-модуль, Crypto AML |
 | **Карьера** | Тренажёр собеседования, поиск работы, CV & pitch |
 
-## Как открыть (Cursor)
+Прогресс сохраняется в браузере (localStorage).
 
-Курс — это **Cursor Canvas** (`.canvas.tsx`). Полная интерактивность — только в [Cursor](https://cursor.com).
+## Локальный запуск
 
-1. Склонируй репозиторий:
-   ```bash
-   git clone https://github.com/ptrvalina/aml-kyc-academy.git
-   ```
-2. Открой папку в Cursor.
-3. Скопируй canvas в workspace:
-   ```
-   .cursor/projects/<your-workspace>/canvases/aml-kyc-training.canvas.tsx
-   ```
-   Файл лежит в репозитории: `canvas/aml-kyc-training.canvas.tsx`
-4. Открой `aml-kyc-training.canvas.tsx` — курс запустится рядом с чатом.
+```bash
+git clone https://github.com/ptrvalina/aml-kyc-academy.git
+cd aml-kyc-academy
+npm install
+npm run dev
+```
 
-## GitHub Pages
+Сборка для production:
 
-Если Pages ещё не включён:
+```bash
+npm run build
+npm run preview
+```
 
-1. **Settings → Pages → Build from branch:** `main`, folder **`/docs`**
-2. Сайт: [https://ptrvalina.github.io/aml-kyc-academy/](https://ptrvalina.github.io/aml-kyc-academy/)
+## Деплой (GitHub Pages)
+
+Push в `main` автоматически деплоит через GitHub Actions (`.github/workflows/deploy.yml`).
+
+Вручную: **Settings → Pages → Source: GitHub Actions**.
 
 ## Структура
 
 ```
-aml-kyc-academy/
-├── README.md
-├── docs/index.html              # лендинг (GitHub Pages)
-└── canvas/aml-kyc-training.canvas.tsx
+src/
+  App.tsx          # основное приложение курса
+  lib/ui.tsx       # UI-компоненты
+  lib/dag-layout.ts
+index.html
+vite.config.ts
 ```
 
 ## Лицензия

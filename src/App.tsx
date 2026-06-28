@@ -23,10 +23,9 @@ import {
   TextArea,
   UsageBar,
   computeDAGLayout,
-  useCanvasAction,
   useCanvasState,
   useHostTheme,
-} from 'cursor/canvas';
+} from './lib/ui';
 
 type SwatchColor = 'blue' | 'green' | 'purple' | 'orange' | 'pink' | 'yellow' | 'gray';
 type TermCategory = 'basics' | 'screening' | 'monitoring' | 'investigation' | 'redflags' | 'systems';
@@ -240,7 +239,7 @@ const UI: Record<string, Partial<Record<UiKey, string>>> = {
     queueTitle: 'Alert Queue', queueCount: 'в очереди', analystLabel: 'Analyst',
     tabOverview: 'Overview', tabCustomer: 'Customer 360', tabScreening: 'Screening', tabTransactions: 'Transactions', tabInvestigation: 'Investigation',
     scenario: 'Сценарий', tasks: 'Задания расследования', investigationNotes: 'Investigation Notes (audit trail)',
-    checkAnswer: 'Submit analysis', aiExpert: 'AI Senior Analyst', aiExpertHint: 'Открыт чат с AI — ниже мгновенная авто-оценка.',
+    checkAnswer: 'Submit analysis',
     minWordsHint: 'Мин. слов', customerId: 'Customer ID', riskScore: 'Risk Score', priority: 'Priority', slaRemaining: 'SLA',
     alertStatus: 'Status', ruleTriggered: 'Rule triggered', assignToMe: 'Assign to me', sendRfi: 'Send RFI', escalateMlro: 'Escalate MLRO',
     closeAlert: 'Close alert', fileSar: 'File SAR', filterAll: 'Все категории', searchCases: 'Поиск alert ID, customer, сценарий…',
@@ -265,7 +264,7 @@ const UI: Record<string, Partial<Record<UiKey, string>>> = {
     queueTitle: 'Alert Queue', queueCount: 'in queue', analystLabel: 'Analyst',
     tabOverview: 'Overview', tabCustomer: 'Customer 360', tabScreening: 'Screening', tabTransactions: 'Transactions', tabInvestigation: 'Investigation',
     scenario: 'Scenario', tasks: 'Investigation tasks', investigationNotes: 'Investigation Notes (audit trail)',
-    checkAnswer: 'Submit analysis', aiExpert: 'AI Senior Analyst', aiExpertHint: 'AI chat opened — instant auto-score below.',
+    checkAnswer: 'Submit analysis',
     minWordsHint: 'Min. words', customerId: 'Customer ID', riskScore: 'Risk Score', priority: 'Priority', slaRemaining: 'SLA',
     alertStatus: 'Status', ruleTriggered: 'Rule triggered', assignToMe: 'Assign to me', sendRfi: 'Send RFI', escalateMlro: 'Escalate MLRO',
     closeAlert: 'Close alert', fileSar: 'File SAR', filterAll: 'All categories', searchCases: 'Search alert ID, customer, scenario…',
@@ -290,7 +289,7 @@ const UI: Record<string, Partial<Record<UiKey, string>>> = {
     queueTitle: 'Alert Queue', queueCount: 'eilėje', analystLabel: 'Analyst',
     tabOverview: 'Overview', tabCustomer: 'Customer 360', tabScreening: 'Screening', tabTransactions: 'Transactions', tabInvestigation: 'Investigation',
     scenario: 'Scenarijus', tasks: 'Tyrimo užduotys', investigationNotes: 'Investigation Notes (audit trail)',
-    checkAnswer: 'Pateikti analizę', aiExpert: 'AI Senior Analyst', aiExpertHint: 'Atidarytas AI pokalbis — žemiau automatinis įvertinimas.',
+    checkAnswer: 'Pateikti analizę',
     minWordsHint: 'Min. žodžių', customerId: 'Customer ID', riskScore: 'Risk Score', priority: 'Priority', slaRemaining: 'SLA',
     alertStatus: 'Status', ruleTriggered: 'Rule triggered', assignToMe: 'Assign to me', sendRfi: 'Send RFI', escalateMlro: 'Escalate MLRO',
     closeAlert: 'Close alert', fileSar: 'File SAR', filterAll: 'Visos kategorijos', searchCases: 'Ieškoti alert ID, customer…',
@@ -316,7 +315,7 @@ const UI: Record<string, Partial<Record<UiKey, string>>> = {
     queueTitle: 'Alert Queue', queueCount: 'у черзі', analystLabel: 'Analyst',
     tabOverview: 'Overview', tabCustomer: 'Customer 360', tabScreening: 'Screening', tabTransactions: 'Transactions', tabInvestigation: 'Investigation',
     scenario: 'Сценарій', tasks: 'Завдання розслідування', investigationNotes: 'Investigation Notes (audit trail)',
-    checkAnswer: 'Submit analysis', aiExpert: 'AI Senior Analyst', aiExpertHint: 'Відкрито AI-чат — нижче миттєва авто-оцінка.',
+    checkAnswer: 'Submit analysis',
     minWordsHint: 'Мін. слів', customerId: 'Customer ID', riskScore: 'Risk Score', priority: 'Priority', slaRemaining: 'SLA',
     alertStatus: 'Status', ruleTriggered: 'Rule triggered', assignToMe: 'Assign to me', sendRfi: 'Send RFI', escalateMlro: 'Escalate MLRO',
     closeAlert: 'Close alert', fileSar: 'File SAR', filterAll: 'Усі категорії', searchCases: 'Пошук alert ID, customer…',
@@ -342,7 +341,7 @@ const UI: Record<string, Partial<Record<UiKey, string>>> = {
     queueTitle: 'Alert Queue', queueCount: 'w kolejce', analystLabel: 'Analyst',
     tabOverview: 'Overview', tabCustomer: 'Customer 360', tabScreening: 'Screening', tabTransactions: 'Transactions', tabInvestigation: 'Investigation',
     scenario: 'Scenariusz', tasks: 'Zadania dochodzeniowe', investigationNotes: 'Investigation Notes (audit trail)',
-    checkAnswer: 'Submit analysis', aiExpert: 'AI Senior Analyst', aiExpertHint: 'Otwarty czat AI — poniżej auto-ocena.',
+    checkAnswer: 'Submit analysis',
     minWordsHint: 'Min. słów', customerId: 'Customer ID', riskScore: 'Risk Score', priority: 'Priority', slaRemaining: 'SLA',
     alertStatus: 'Status', ruleTriggered: 'Rule triggered', assignToMe: 'Assign to me', sendRfi: 'Send RFI', escalateMlro: 'Escalate MLRO',
     closeAlert: 'Close alert', fileSar: 'File SAR', filterAll: 'Wszystkie kategorie', searchCases: 'Szukaj alert ID, customer…',
@@ -365,7 +364,7 @@ function uiFromEn(overrides: Partial<Record<UiKey, string>>): Record<UiKey, stri
 const UI_EXTRA: Partial<Record<UiKey, string>> = {
   swCatalogTitle: 'AML/KYC Software Catalog', swCatalogHint: 'Click any system — details, mock dashboards, vendor links open inline.',
   swUsedFor: 'Used for', swTypicalUsers: 'Typical users', swVisitVendor: 'Official vendor website', swDashboards: 'Analyst dashboard previews',
-  swSelectHint: 'Select a system from the list on the left', swWorkflow: 'Daily analyst workflow', swAskAi: 'Ask AI about this tool',
+  swSelectHint: 'Select a system from the list on the left', swWorkflow: 'Daily analyst workflow',
   swAllCategories: 'All categories',
   termsLearned: 'Terms learned', understood: 'Got it', moreDetails: 'More details', close: 'Close',
   careerMap: 'Career map (all paths)', courseSections: 'Course sections', jobReadyTitle: 'Congratulations — Job Ready!',
@@ -391,7 +390,7 @@ const UI_EXTRA: Partial<Record<UiKey, string>> = {
 Object.assign(UI.ru, {
   swCatalogTitle: 'Каталог AML/KYC софта', swCatalogHint: 'Нажми на систему слева — описание, mock-дашборды и ссылки откроются здесь.',
   swUsedFor: 'Используется для', swTypicalUsers: 'Типичные пользователи', swVisitVendor: 'Официальный сайт вендора', swDashboards: 'Превью дашбордов аналитика',
-  swSelectHint: 'Выберите систему из списка слева', swWorkflow: 'Ежедневный workflow аналитика', swAskAi: 'Спросить AI про этот инструмент',
+  swSelectHint: 'Выберите систему из списка слева', swWorkflow: 'Ежедневный workflow аналитика',
   swAllCategories: 'Все категории',
   termsLearned: 'Терминов изучено', understood: 'Понятно', moreDetails: 'Подробнее', close: 'Закрыть',
   careerMap: 'Карта профессии', courseSections: 'Разделы курса', jobReadyTitle: 'Поздравляем — Job Ready!',
@@ -2225,7 +2224,6 @@ const VERDICT_TONE: Record<Verdict, 'success' | 'warning' | 'danger' | 'info'> =
 function DetailPanel() {
   const theme = useHostTheme();
   const [panel, setPanel] = useCanvasState<DetailPanelState>('detail-panel', null);
-  const dispatch = useCanvasAction();
   if (!panel) return null;
 
   if (panel.kind === 'term') {
@@ -2247,17 +2245,6 @@ function DetailPanel() {
             <Divider />
             <Text weight="medium">Technical English</Text>
             <Text>{term.english}</Text>
-            <Button
-              variant="ghost"
-              onClick={() =>
-                dispatch({
-                  type: 'newComposerChat',
-                  userPrompt: `Объясни подробнее термин «${term.abbr}» (${term.full}) в контексте AML/KYC. Приведи пример кейса и типичные ошибки аналитиков.`,
-                })
-              }
-            >
-              Спросить AI-эксперта
-            </Button>
           </Stack>
         </CardBody>
       </Card>
@@ -2298,17 +2285,6 @@ function DetailPanel() {
                 <span key={t}><Pill tone="info" size="sm">{t}</Pill></span>
               ))}
             </Row>
-            <Button
-              variant="ghost"
-              onClick={() =>
-                dispatch({
-                  type: 'newComposerChat',
-                  userPrompt: `Расскажи подробно про AML-регулирование в ${reg.country}: закон ${reg.name}, обязанности банков, типичные нарушения и как готовиться к работе compliance analyst.`,
-                })
-              }
-            >
-              Углубить с AI
-            </Button>
           </Stack>
         </CardBody>
       </Card>
@@ -2376,17 +2352,6 @@ function DetailPanel() {
                 ['Вендор', sw.vendor],
               ]}
             />
-            <Button
-              variant="ghost"
-              onClick={() =>
-                dispatch({
-                  type: 'newComposerChat',
-                  userPrompt: `Расскажи как AML/KYC analyst использует ${sw.name} (${sw.vendor}) в ежедневной работе: типичный workflow, KPI, типичные ошибки новичков, как упомянуть в CV/интервью.`,
-                })
-              }
-            >
-              Спросить AI про этот софт
-            </Button>
           </Stack>
         </CardBody>
       </Card>
@@ -2784,48 +2749,20 @@ function ExamBlock({ moduleId, exam, passScore, lang, onPass, hideModulePassedCa
 }
 
 function CaseEvaluator({ caseId, lang }: { caseId: string; lang: Lang }) {
-  const dispatch = useCanvasAction();
   const theme = useHostTheme();
   const pc = getCaseById(caseId);
   const [answer, setAnswer] = useCanvasState(`case-answer-${caseId}`, '');
   const [result, setResult] = useCanvasState<EvalResult | null>(`case-result-${caseId}`, null);
-  const [aiLoading, setAiLoading] = useCanvasState(`case-ai-${caseId}`, false);
 
   if (!pc) {
     return <Callout tone="danger" title={t(lang, 'caseNotFound')}>ID: {caseId}</Callout>;
   }
 
   const content = getLocalizedCase(pc, lang);
-  const aiLang = lang === 'ru' ? 'русском' : lang === 'uk' ? 'українській' : lang === 'lt' ? 'lietuvių' : lang === 'pl' ? 'polskim' : 'English';
 
   const runCheck = () => {
     const evalResult = evaluateAnswer(answer, pc.rubric);
     setResult(evalResult);
-    setAiLoading(false);
-  };
-
-  const runAiCheck = () => {
-    setAiLoading(true);
-    const prompt = `You are an expert AML/KYC Compliance Analyst. Review the student's answer.
-
-CASE: ${content.title}
-SCENARIO: ${content.scenario}
-TASKS: ${content.tasks.map((task, i) => `${i + 1}. ${task}`).join('; ')}
-
-STUDENT ANSWER:
-${answer || '(empty)'}
-
-Respond in ${aiLang}. Format:
-1. VERDICT: Correct / Correct, but… / Incorrect, but… / Incorrect
-2. SCORE: X/100
-3. CORRECT POINTS: bullet list
-4. REMARKS: bullet list
-5. MODEL ANSWER: senior analyst fragment (3-5 sentences)
-
-Use AML terms: red flags, SAR, EDD, RFI, etc.`;
-
-    dispatch({ type: 'newComposerChat', userPrompt: prompt });
-    runCheck();
   };
 
   const placeholders: Record<string, string> = {
@@ -2873,14 +2810,7 @@ Use AML terms: red flags, SAR, EDD, RFI, etc.`;
         <Button variant="primary" onClick={runCheck} disabled={answer.trim().length < 20}>
           {t(lang, 'checkAnswer')}
         </Button>
-        <Button variant="ghost" onClick={runAiCheck} disabled={answer.trim().length < 20}>
-          {t(lang, 'aiExpert')}
-        </Button>
       </Row>
-
-      {aiLoading && (
-        <Callout tone="info" title={t(lang, 'aiExpert')}>{t(lang, 'aiExpertHint')}</Callout>
-      )}
 
       {result && (
         <Callout tone={VERDICT_TONE[result.verdict]} title={`${verdictLabel(lang, result.verdict)} — ${result.percent}%`}>
@@ -3021,7 +2951,6 @@ function EnglishView() {
   const [catFilter, setCatFilter] = useCanvasState<EnglishLesson['category'] | 'all'>('english-cat', 'all');
   const [practice, setPractice] = useCanvasState('english-practice', '');
   const [enResult, setEnResult] = useCanvasState<EvalResult | null>('english-result', null);
-  const dispatch = useCanvasAction();
 
   const filteredLessons = catFilter === 'all' ? ENGLISH_LESSONS : ENGLISH_LESSONS.filter((l) => l.category === catFilter);
   const lesson = ENGLISH_LESSONS.find((l) => l.id === lessonId) ?? filteredLessons[0];
@@ -3114,17 +3043,6 @@ function EnglishView() {
         <Button variant="primary" onClick={checkEnglish} disabled={practice.trim().length < 20}>
           Проверить English
         </Button>
-        <Button
-          variant="ghost"
-          onClick={() =>
-            dispatch({
-              type: 'newComposerChat',
-              userPrompt: `Проверь мой технический/economic English для AML/KYC. Упражнение: ${lesson.exercise}\n\nМой ответ:\n${practice}\n\nИсправь грамматику, предложи профессиональные формулировки.`,
-            })
-          }
-        >
-          AI-проверка English
-        </Button>
       </Row>
 
       {enResult && (
@@ -3203,8 +3121,8 @@ function ActimizeCaseConsole({ lang, cases = ALL_PRACTICE_CASES, defaultCaseId =
   const meta = selected ? getAlertMeta(selected) : null;
   const content = selected ? getLocalizedCase(selected, lang) : null;
 
-  const priorityTone = (p: string): 'deleted' | 'warning' | 'info' =>
-    p === 'P1' ? 'deleted' : p === 'P2' ? 'warning' : 'info';
+  const priorityTone = (p: string): 'danger' | 'warning' | 'info' =>
+    p === 'P1' ? 'danger' : p === 'P2' ? 'warning' : 'info';
 
   return (
     <Stack gap={12}>
@@ -3542,7 +3460,6 @@ function MockDashboardPreview({ variant, title, panelIndex }: { variant: Dashboa
 
 function SoftwareCatalogView({ lang }: { lang: Lang }) {
   const theme = useHostTheme();
-  const dispatch = useCanvasAction();
   const [catFilter, setCatFilter] = useCanvasState<string>('software-cat', 'all');
   const [selectedId, setSelectedId] = useCanvasState('software-selected-id', 'actimize');
   const [dashTab, setDashTab] = useCanvasState('software-dash-tab', '0');
@@ -3625,19 +3542,6 @@ function SoftwareCatalogView({ lang }: { lang: Lang }) {
 
               <Row gap={8} wrap>
                 <Link href={selected.websiteUrl}>{t(lang, 'swVisitVendor')}</Link>
-                <Button
-                  variant="ghost"
-                  onClick={() =>
-                    dispatch({
-                      type: 'newComposerChat',
-                      userPrompt: lang === 'ru'
-                        ? `Расскажи как AML/KYC analyst использует ${selected.name} (${selected.vendor}) в ежедневной работе: workflow, KPI, ошибки новичков, CV/интервью.`
-                        : `Explain how an AML/KYC analyst uses ${selected.name} (${selected.vendor}) daily: workflow, KPIs, rookie mistakes, CV/interview tips.`,
-                    })
-                  }
-                >
-                  {t(lang, 'swAskAi')}
-                </Button>
               </Row>
 
               <Divider />
@@ -3697,7 +3601,6 @@ function SoftwareCatalogView({ lang }: { lang: Lang }) {
 }
 
 function CryptoVerificationView() {
-  const dispatch = useCanvasAction();
   const cryptoCaseCount = ALL_PRACTICE_CASES.filter((c) => c.category === 'crypto' || c.category === 'defi').length;
 
   return (
@@ -3737,17 +3640,6 @@ function CryptoVerificationView() {
         </div>
       ))}
 
-      <Button
-        variant="primary"
-        onClick={() =>
-          dispatch({
-            type: 'newComposerChat',
-            userPrompt: 'Проведи меня через полный crypto AML кейс как senior analyst: клиент выводит 50K EUR на Binance, Chainalysis показывает 12% mixer exposure. Пошагово: KYT, trace, Travel Rule, RFI, decision.',
-          })
-        }
-      >
-        Разобрать crypto-кейс с AI-экспертом
-      </Button>
     </Stack>
   );
 }
@@ -4021,7 +3913,6 @@ const INTERVIEW_QUESTIONS = [
 ];
 
 function InterviewTrainerView({ lang }: { lang: Lang }) {
-  const dispatch = useCanvasAction();
   const [tab, setTab] = useCanvasState('interview-tab', 'job');
 
   return (
@@ -4058,14 +3949,6 @@ function InterviewTrainerView({ lang }: { lang: Lang }) {
                 <CardHeader>{i + 1}. {item.q}</CardHeader>
                 <CardBody>
                   <Text size="small" tone="secondary">{lang === 'ru' ? 'Подсказка' : 'Hint'}: {item.hint}</Text>
-                  <div style={{ marginTop: 10 }}>
-                    <Button variant="ghost" onClick={() => dispatch({
-                      type: 'newComposerChat',
-                      userPrompt: `Помоги подготовить ответ на interview question (AML/KYC): "${item.q}". Дай model answer senior analyst + что НЕ говорить.`,
-                    })}>
-                      {lang === 'ru' ? 'Разобрать с AI' : 'Practice with AI'}
-                    </Button>
-                  </div>
                 </CardBody>
               </Card>
             </div>
@@ -4087,12 +3970,6 @@ function InterviewTrainerView({ lang }: { lang: Lang }) {
               ['Tools', 'Case management, screening platforms, OpenCorporates, OSINT methodology'],
             ]}
           />
-          <Button variant="primary" onClick={() => dispatch({
-            type: 'newComposerChat',
-            userPrompt: 'Review my AML/KYC CV structure for Financial Crime Analyst role. I have OSINT background. Give bullet points in English and interview pitch.',
-          })}>
-            {lang === 'ru' ? 'CV review с AI' : 'AI CV review'}
-          </Button>
         </Stack>
       )}
     </Stack>
