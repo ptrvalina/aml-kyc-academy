@@ -35,11 +35,16 @@ npm run preview
 
 ## Деплой (GitHub Pages)
 
-Push в `main` автоматически деплоит через GitHub Actions (`.github/workflows/deploy.yml`).
+После push в `main` GitHub Actions собирает приложение и кладёт результат в папку `docs/`.
 
-Вручную: **Settings → Pages → Source: GitHub Actions**.
+**Settings → Pages:**
+- **Source:** Deploy from a branch
+- **Branch:** `main`
+- **Folder:** `/docs`
 
-## Структура
+Сайт: [https://ptrvalina.github.io/aml-kyc-academy/](https://ptrvalina.github.io/aml-kyc-academy/)
+
+> Не используй `/ (root)` — там лежат исходники для разработки, не собранный сайт.
 
 ```
 src/
