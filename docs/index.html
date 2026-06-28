@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AML/KYC Academy — учебный курс</title>
+  <meta name="description" content="AML/KYC Compliance + OSINT: 14 модулей AML, 6 модулей OSINT, 350+ кейсов, финальные экзамены, тренажёр собеседования.">
+  <style>
+    :root {
+      --bg: #0f1419;
+      --surface: #1a2332;
+      --border: #2d3a4d;
+      --text: #e7ecf3;
+      --muted: #8b9cb3;
+      --accent: #3b82f6;
+      --green: #22c55e;
+      --font: system-ui, -apple-system, "Segoe UI", sans-serif;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: var(--font);
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      min-height: 100vh;
+    }
+    .wrap { max-width: 920px; margin: 0 auto; padding: 48px 24px 80px; }
+    header { margin-bottom: 48px; }
+    .badge {
+      display: inline-block;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 12px;
+    }
+    h1 { font-size: 2rem; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 12px; }
+    .lead { font-size: 1.125rem; color: var(--muted); max-width: 640px; }
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 12px;
+      margin: 32px 0;
+    }
+    .stat {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+    }
+    .stat strong { display: block; font-size: 1.5rem; color: var(--text); }
+    .stat span { font-size: 13px; color: var(--muted); }
+    h2 { font-size: 1.125rem; font-weight: 600; margin: 40px 0 16px; }
+    .tracks { display: grid; gap: 12px; }
+    .track {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 20px;
+    }
+    .track h3 { font-size: 1rem; margin-bottom: 6px; }
+    .track p { font-size: 14px; color: var(--muted); }
+    .steps { list-style: none; margin: 24px 0; }
+    .steps li {
+      padding: 12px 0 12px 28px;
+      border-bottom: 1px solid var(--border);
+      position: relative;
+      font-size: 15px;
+    }
+    .steps li:last-child { border-bottom: none; }
+    .steps li::before {
+      content: counter(step);
+      counter-increment: step;
+      position: absolute;
+      left: 0;
+      width: 20px;
+      height: 20px;
+      background: var(--accent);
+      color: #fff;
+      font-size: 11px;
+      font-weight: 700;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      top: 14px;
+    }
+    .steps { counter-reset: step; }
+    .actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 32px; }
+    a.btn {
+      display: inline-block;
+      padding: 12px 20px;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 600;
+      text-decoration: none;
+      border: 1px solid var(--border);
+      color: var(--text);
+      background: var(--surface);
+    }
+    a.btn-primary {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+    }
+    a.btn:hover { opacity: 0.9; }
+    footer {
+      margin-top: 56px;
+      padding-top: 24px;
+      border-top: 1px solid var(--border);
+      font-size: 13px;
+      color: var(--muted);
+    }
+    code {
+      background: var(--surface);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 13px;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="badge">Open course</div>
+      <h1>AML/KYC Academy</h1>
+      <p class="lead">
+        Подготовка к роли AML/KYC Analyst и OSINT Researcher: модули с экзаменами,
+        сотни практических кейсов и тренажёр собеседования.
+      </p>
+    </header>
+
+    <div class="stats">
+      <div class="stat"><strong>14</strong><span>модулей AML</span></div>
+      <div class="stat"><strong>6</strong><span>модулей OSINT</span></div>
+      <div class="stat"><strong>350+</strong><span>практических кейсов</span></div>
+      <div class="stat"><strong>10</strong><span>языков интерфейса</span></div>
+    </div>
+
+    <h2>Треки обучения</h2>
+    <div class="tracks">
+      <div class="track">
+        <h3>AML / KYC Compliance</h3>
+        <p>Урок → тест (80%) → следующий модуль. После 14 модулей — финальный экзамен: 40 вопросов теории + 10 практических кейсов.</p>
+      </div>
+      <div class="track">
+        <h3>OSINT Investigator</h3>
+        <p>6 модулей (методология, dorking, UBO, adverse media, people OSINT, EDD-отчёты) + 50 кейсов для практики + финальный экзамен.</p>
+      </div>
+      <div class="track">
+        <h3>Тренажёр собеседования</h3>
+        <p>Как искать работу, типовые вопросы интервью, CV и elevator pitch для Financial Crime ролей.</p>
+      </div>
+    </div>
+
+    <h2>Как начать</h2>
+    <ol class="steps">
+      <li>Установи <a href="https://cursor.com" style="color: var(--accent);">Cursor</a> — курс работает как интерактивный Canvas.</li>
+      <li>Склонируй репозиторий с GitHub или скачай ZIP.</li>
+      <li>Положи файл <code>canvas/aml-kyc-training.canvas.tsx</code> в папку <code>canvases/</code> своего workspace в Cursor.</li>
+      <li>Открой файл — курс запустится рядом с чатом. Прогресс сохраняется локально.</li>
+    </ol>
+
+    <div class="actions">
+      <a class="btn btn-primary" id="repo-link" href="https://github.com/Aliaksei/aml-kyc-academy">Исходники на GitHub</a>
+      <a class="btn" href="https://cursor.com">Скачать Cursor</a>
+    </div>
+
+    <footer>
+      <p>Интерактивная версия — только в Cursor Canvas. Эта страница — публичное описание курса (GitHub Pages).</p>
+      <p style="margin-top: 8px;">Замени <code>Aliaksei</code> в ссылке на GitHub на свой username после создания репозитория.</p>
+    </footer>
+  </div>
+</body>
+</html>

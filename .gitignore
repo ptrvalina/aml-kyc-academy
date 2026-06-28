@@ -1,0 +1,10 @@
+# Cursor canvas runtime state (local only)
+*.canvas.data.json
+*.canvas.status.json
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.log
