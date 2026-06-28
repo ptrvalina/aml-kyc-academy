@@ -2,8 +2,10 @@
 
 Интерактивный учебный курс **AML/KYC Compliance + OSINT** для подготовки к роли Financial Crime Analyst.
 
-**Публичная страница:** после публикации на GitHub Pages —  
-`https://<ваш-username>.github.io/aml-kyc-academy/`
+**Репозиторий:** [github.com/ptrvalina/aml-kyc-academy](https://github.com/ptrvalina/aml-kyc-academy)
+
+**Публичная страница (GitHub Pages):**  
+[https://ptrvalina.github.io/aml-kyc-academy/](https://ptrvalina.github.io/aml-kyc-academy/)
 
 ## Что внутри
 
@@ -20,43 +22,32 @@
 
 1. Склонируй репозиторий:
    ```bash
-   git clone https://github.com/<username>/aml-kyc-academy.git
+   git clone https://github.com/ptrvalina/aml-kyc-academy.git
    ```
 2. Открой папку в Cursor.
-3. Скопируй canvas в workspace Cursor:
+3. Скопируй canvas в workspace:
    ```
    .cursor/projects/<your-workspace>/canvases/aml-kyc-training.canvas.tsx
    ```
-   Или положи файл из `canvas/aml-kyc-training.canvas.tsx` в `canvases/` своего проекта.
-4. Открой файл `aml-kyc-training.canvas.tsx` — canvas откроется рядом с чатом.
+   Файл лежит в репозитории: `canvas/aml-kyc-training.canvas.tsx`
+4. Открой `aml-kyc-training.canvas.tsx` — курс запустится рядом с чатом.
 
-## GitHub Pages (публичная ссылка)
+## GitHub Pages
 
-1. Создай репозиторий на GitHub: **aml-kyc-academy** (Public).
-2. Запушь этот проект:
-   ```bash
-   cd aml-kyc-academy
-   git remote add origin https://github.com/<username>/aml-kyc-academy.git
-   git branch -M main
-   git push -u origin main
-   ```
-3. **Settings → Pages → Build from branch:** `main`, folder **`/docs`**.
-4. Через 1–2 минуты сайт будет доступен по адресу:
-   ```
-   https://<username>.github.io/aml-kyc-academy/
-   ```
+Если Pages ещё не включён:
 
-## Структура репозитория
+1. **Settings → Pages → Build from branch:** `main`, folder **`/docs`**
+2. Сайт: [https://ptrvalina.github.io/aml-kyc-academy/](https://ptrvalina.github.io/aml-kyc-academy/)
+
+## Структура
 
 ```
 aml-kyc-academy/
 ├── README.md
-├── docs/
-│   └── index.html          # лендинг для GitHub Pages
-└── canvas/
-    └── aml-kyc-training.canvas.tsx   # исходник курса
+├── docs/index.html              # лендинг (GitHub Pages)
+└── canvas/aml-kyc-training.canvas.tsx
 ```
 
 ## Лицензия
 
-MIT — свободное использование с указанием авторства.
+MIT
