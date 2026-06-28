@@ -28,6 +28,8 @@ import {
   useHostTheme,
 } from './lib/ui';
 import { evaluateAnswer } from './lib/evaluator';
+import { COURSE_MODULES, COURSE_MODULE_META, COURSE_TITLE, COURSE_SUBTITLE, type PracticeTask, type CourseModule } from './data/course-modules';
+import { PracticeTasksPanel, StudentCabinetView } from './components/StudentCabinet';
 
 type SwatchColor = 'blue' | 'green' | 'purple' | 'orange' | 'pink' | 'yellow' | 'gray';
 type TermCategory = 'basics' | 'screening' | 'monitoring' | 'investigation' | 'redflags' | 'systems';
@@ -226,12 +228,13 @@ type UiKey =
   | 'nextModule' | 'finalExamTitle' | 'finalExamTheory' | 'finalExamPractical' | 'finalExamLocked' | 'finalExamUnlocked'
   | 'finalExamPass' | 'certified' | 'optional' | 'moduleObjectives' | 'moduleTakeaways' | 'proTip' | 'courseProgress'
   | 'navOsintTrack' | 'navOsintCases' | 'navInterview' | 'osintTrackTitle' | 'osintFinalExam' | 'osintModulesPassed'
-  | 'footerAml' | 'footerOsint' | 'footerPractice' | 'footerOptional' | 'footerCareer' | 'jobSearchTitle' | 'interviewPrep';
+  | 'footerAml' | 'footerOsint' | 'footerPractice' | 'footerOptional' | 'footerCareer' | 'jobSearchTitle' | 'interviewPrep'
+  | 'navMyProgress' | 'tabPracticeTasks';
 
 const UI: Record<string, Partial<Record<UiKey, string>>> = {
   ru: {
-    appTitle: 'AML/KYC Compliance — учебный полигон',
-    appSubtitle: 'Financial Crime Investigator | AML/KYC Analyst | OSINT & Forensic',
+    appTitle: COURSE_TITLE,
+    appSubtitle: COURSE_SUBTITLE,
     langLabel: 'Язык курса',
     navHome: 'Главная', navGlossary: 'Глоссарий', navRegulations: 'Нормативка', navEnglish: 'English + Audio',
     navPolygone: 'Case Manager', navCrypto: 'Crypto AML', navSoftware: 'Каталог софта', navResources: 'Ресурсы',
@@ -249,7 +252,8 @@ const UI: Record<string, Partial<Record<UiKey, string>>> = {
     passed: 'Сдан', locked: 'Заблокирован', available: 'Доступен', moduleLocked: 'Модуль заблокирован',
     caseNotFound: 'Alert не найден', tabLesson: 'Урок', tabGlossaryMod: 'Глоссарий', tabPractice: 'Практика', tabExam: 'Экзамен',
     foundInAnswer: 'Найдено в ответе', missing: 'Не хватает', mistakes: 'Ошибки',
-    howToPass: 'Модули 1→14: урок → тест (80%). Следующий открывается после сдачи. Затем финальный экзамен: 40 вопросов + 10 практических кейсов.',
+    howToPass: '8 модулей: урок → практика → тест (80%). Следующий открывается после сдачи. Финальный экзамен + отчёт в личном кабинете.',
+    navMyProgress: 'Мой прогресс', tabPracticeTasks: 'Задания ТЗ',
     verdictCorrect: 'Верно', verdictPartialOk: 'Верно, но…', verdictPartialBad: 'Неверно, но…', verdictIncorrect: 'Неверно',
     contentEnNote: '', worldCheck: 'World-Check One', noHits: 'No PEP/Sanctions hits', screeningPending: 'Review required',
     mockTxn: 'Triggered transactions', profileMismatch: 'Profile vs activity',
@@ -274,7 +278,8 @@ const UI: Record<string, Partial<Record<UiKey, string>>> = {
     passed: 'Passed', locked: 'Locked', available: 'Available', moduleLocked: 'Module locked',
     caseNotFound: 'Alert not found', tabLesson: 'Lesson', tabGlossaryMod: 'Glossary', tabPractice: 'Practice', tabExam: 'Exam',
     foundInAnswer: 'Found in answer', missing: 'Missing', mistakes: 'Mistakes',
-    howToPass: 'Modules 1→14: lesson → test (80%). Next unlocks after pass. Then final exam: 40 questions + 10 practical cases.',
+    howToPass: '8 modules: lesson → practice → test (80%). Final exam + progress report in student cabinet.',
+    navMyProgress: 'My progress', tabPracticeTasks: 'Practice tasks',
     verdictCorrect: 'Correct', verdictPartialOk: 'Correct, but…', verdictPartialBad: 'Incorrect, but…', verdictIncorrect: 'Incorrect',
     contentEnNote: '', worldCheck: 'World-Check One', noHits: 'No PEP/Sanctions hits', screeningPending: 'Review required',
     mockTxn: 'Triggered transactions', profileMismatch: 'Profile vs activity',
@@ -370,17 +375,18 @@ const UI_EXTRA: Partial<Record<UiKey, string>> = {
   swAllCategories: 'All categories',
   termsLearned: 'Terms learned', understood: 'Got it', moreDetails: 'More details', close: 'Close',
   careerMap: 'Career map (all paths)', courseSections: 'Course sections', jobReadyTitle: 'Congratulations — Job Ready!',
-  jobReadyBody: '14/14 modules + final exam passed. Ready for KYC, TM, Sanctions, EDD/OSINT, Fraud, Crypto Compliance.',
+  jobReadyBody: '8/8 modules + final exam passed. Ready for Junior AML/KYC Analyst roles.',
   osintAmlTitle: 'OSINT → AML', direction: 'Direction', modulesCol: 'Modules', whereToGo: 'Where to apply',
   certification: 'Certification & trainers', resource: 'Resource', resourceType: 'Type', resourceWhy: 'Why',
   weekPlan: '4-week plan', examSubmit: 'Submit exam', examRetake: 'Retake', examResult: 'Result',
   regionsIntro: 'Global AML/CFT/Sanctions regulations. Click a country for full details.',
   allRegions: 'All regions', englishPractice: 'Practice answer', checkEnglish: 'Check English', lessonFlowTitle: 'AML investigation flow',
   stepLearn: 'Lesson', stepExam: 'Module test', stepGlossary: 'Glossary', stepPractice: 'Practice case',
-  examUnlockTitle: 'Ready for the module test?', examUnlockBody: 'Pass the test (80%) to unlock the next module. You can review the glossary and practice case first — they are optional.',
+  examUnlockTitle: 'Ready for the module test?', examUnlockBody: 'Pass the test (80%) to unlock the next module. Practice tasks and Case Manager cases are optional but recommended.',
   goToExam: 'Take module test →', nextModule: 'Next module →', finalExamTitle: 'Final certification exam',
   finalExamTheory: 'Part 1 — Theory (40 questions)', finalExamPractical: 'Part 2 — Practical (10 cases)',
-  finalExamLocked: 'Complete all 14 modules to unlock the final exam.', finalExamUnlocked: 'All modules passed — final exam available!',
+  finalExamLocked: 'Complete all 8 modules to unlock the final exam.', finalExamUnlocked: 'All modules passed — final exam available!',
+  navMyProgress: 'My progress', tabPracticeTasks: 'Practice tasks',
   finalExamPass: 'Certification earned — you are Job Ready!', certified: 'Certified', optional: 'optional',
   moduleObjectives: 'Learning objectives', moduleTakeaways: 'Key takeaways', proTip: 'Pro tip', courseProgress: 'Course progress',
   navOsintTrack: 'OSINT Track', navOsintCases: 'OSINT Practice (50)', navInterview: 'Interview Trainer',
@@ -396,17 +402,18 @@ Object.assign(UI.ru, {
   swAllCategories: 'Все категории',
   termsLearned: 'Терминов изучено', understood: 'Понятно', moreDetails: 'Подробнее', close: 'Закрыть',
   careerMap: 'Карта профессии', courseSections: 'Разделы курса', jobReadyTitle: 'Поздравляем — Job Ready!',
-  jobReadyBody: '14/14 модулей + финальный экзамен. Готова к KYC, TM, Sanctions, EDD/OSINT, Fraud, Crypto Compliance.',
+  jobReadyBody: '8/8 модулей + финальный экзамен. Готова к позиции Junior AML/KYC Analyst.',
   osintAmlTitle: 'OSINT → AML', direction: 'Направление', modulesCol: 'Модули', whereToGo: 'Куда идти',
   certification: 'Сертификация и тренажёры', resource: 'Ресурс', resourceType: 'Тип', resourceWhy: 'Зачем',
   weekPlan: '4-недельный план', examSubmit: 'Сдать экзамен', examRetake: 'Пересдать', examResult: 'Результат',
   regionsIntro: 'Мировая нормативная база AML. Нажми «Подробнее» на стране.',
   allRegions: 'Все регионы', englishPractice: 'Практический ответ', checkEnglish: 'Проверить English', lessonFlowTitle: 'Цепочка AML-расследования',
   stepLearn: 'Урок', stepExam: 'Тест модуля', stepGlossary: 'Глоссарий', stepPractice: 'Практика',
-  examUnlockTitle: 'Готов к тесту модуля?', examUnlockBody: 'Сдай тест (80%), чтобы открыть следующий модуль. Глоссарий и практический кейс — по желанию.',
+  examUnlockTitle: 'Готов к тесту модуля?', examUnlockBody: 'Сдай тест (80%), чтобы открыть следующий модуль. Практические задания и Case Manager — по желанию, но рекомендуются.',
   goToExam: 'Пройти тест модуля →', nextModule: 'Следующий модуль →', finalExamTitle: 'Финальный сертификационный экзамен',
   finalExamTheory: 'Часть 1 — Теория (40 вопросов)', finalExamPractical: 'Часть 2 — Практика (10 кейсов)',
-  finalExamLocked: 'Пройди все 14 модулей, чтобы открыть финальный экзамен.', finalExamUnlocked: 'Все модули сданы — финальный экзамен доступен!',
+  finalExamLocked: 'Пройди все 8 модулей, чтобы открыть финальный экзамен.', finalExamUnlocked: 'Все модули сданы — финальный экзамен доступен!',
+  navMyProgress: 'Мой прогресс', tabPracticeTasks: 'Задания ТЗ',
   finalExamPass: 'Сертификация получена — ты Job Ready!', certified: 'Сертификат', optional: 'опционально',
   moduleObjectives: 'Цели обучения', moduleTakeaways: 'Главное из модуля', proTip: 'Совет профи', courseProgress: 'Прогресс курса',
   navOsintTrack: 'OSINT-трек', navOsintCases: 'OSINT практика (50)', navInterview: 'Тренажёр собеседования',
@@ -420,11 +427,11 @@ Object.assign(UI.lt, UI_EXTRA);
 Object.assign(UI.uk, UI_EXTRA);
 Object.assign(UI.pl, UI_EXTRA);
 
-(UI as Record<string, Record<UiKey, string>>).de = uiFromEn({ langLabel: 'Kurssprache', appTitle: 'AML/KYC Compliance — Trainingssandbox', navHome: 'Start', navGlossary: 'Glossar', navRegulations: 'Vorschriften', navSoftware: 'Software-Katalog', navResources: 'Ressourcen', howToPass: 'Module 1→14: Lektion → Glossar → Case Manager → Prüfung (80%).', passed: 'Bestanden', locked: 'Gesperrt', available: 'Verfügbar' });
-(UI as Record<string, Record<UiKey, string>>).fr = uiFromEn({ langLabel: 'Langue du cours', appTitle: 'AML/KYC Compliance — Bac à sable', navHome: 'Accueil', navGlossary: 'Glossaire', navRegulations: 'Réglementation', navSoftware: 'Catalogue logiciels', navResources: 'Ressources', howToPass: 'Modules 1→14 : leçon → glossaire → Case Manager → examen (80 %).', passed: 'Réussi', locked: 'Verrouillé', available: 'Disponible' });
-(UI as Record<string, Record<UiKey, string>>).es = uiFromEn({ langLabel: 'Idioma del curso', appTitle: 'AML/KYC Compliance — Entorno de formación', navHome: 'Inicio', navGlossary: 'Glosario', navRegulations: 'Normativa', navSoftware: 'Catálogo de software', navResources: 'Recursos', howToPass: 'Módulos 1→14: lección → glosario → Case Manager → examen (80%).', passed: 'Aprobado', locked: 'Bloqueado', available: 'Disponible' });
-(UI as Record<string, Record<UiKey, string>>).it = uiFromEn({ langLabel: 'Lingua del corso', appTitle: 'AML/KYC Compliance — Sandbox formativo', navHome: 'Home', navGlossary: 'Glossario', navRegulations: 'Normativa', navSoftware: 'Catalogo software', navResources: 'Risorse', howToPass: 'Moduli 1→14: lezione → glossario → Case Manager → esame (80%).', passed: 'Superato', locked: 'Bloccato', available: 'Disponibile' });
-(UI as Record<string, Record<UiKey, string>>).pt = uiFromEn({ langLabel: 'Idioma do curso', appTitle: 'AML/KYC Compliance — Ambiente de treino', navHome: 'Início', navGlossary: 'Glossário', navRegulations: 'Regulação', navSoftware: 'Catálogo de software', navResources: 'Recursos', howToPass: 'Módulos 1→14: lição → glossário → Case Manager → exame (80%).', passed: 'Aprovado', locked: 'Bloqueado', available: 'Disponível' });
+(UI as Record<string, Record<UiKey, string>>).de = uiFromEn({ langLabel: 'Kurssprache', appTitle: COURSE_TITLE, navHome: 'Start', navGlossary: 'Glossar', navRegulations: 'Vorschriften', navSoftware: 'Software-Katalog', navResources: 'Ressourcen', howToPass: '8 Module: Lektion → Praxis → Prüfung (80%).', passed: 'Bestanden', locked: 'Gesperrt', available: 'Verfügbar', navMyProgress: 'Mein Fortschritt' });
+(UI as Record<string, Record<UiKey, string>>).fr = uiFromEn({ langLabel: 'Langue du cours', appTitle: COURSE_TITLE, navHome: 'Accueil', navGlossary: 'Glossaire', navRegulations: 'Réglementation', navSoftware: 'Catalogue logiciels', navResources: 'Ressources', howToPass: '8 modules : leçon → pratique → examen (80 %).', passed: 'Réussi', locked: 'Verrouillé', available: 'Disponible', navMyProgress: 'Ma progression' });
+(UI as Record<string, Record<UiKey, string>>).es = uiFromEn({ langLabel: 'Idioma del curso', appTitle: COURSE_TITLE, navHome: 'Inicio', navGlossary: 'Glosario', navRegulations: 'Normativa', navSoftware: 'Catálogo de software', navResources: 'Recursos', howToPass: '8 módulos: lección → práctica → examen (80%).', passed: 'Aprobado', locked: 'Bloqueado', available: 'Disponible', navMyProgress: 'Mi progreso' });
+(UI as Record<string, Record<UiKey, string>>).it = uiFromEn({ langLabel: 'Lingua del corso', appTitle: COURSE_TITLE, navHome: 'Home', navGlossary: 'Glossario', navRegulations: 'Normativa', navSoftware: 'Catalogo software', navResources: 'Risorse', howToPass: '8 moduli: lezione → pratica → esame (80%).', passed: 'Superato', locked: 'Bloccato', available: 'Disponibile', navMyProgress: 'I miei progressi' });
+(UI as Record<string, Record<UiKey, string>>).pt = uiFromEn({ langLabel: 'Idioma do curso', appTitle: COURSE_TITLE, navHome: 'Início', navGlossary: 'Glossário', navRegulations: 'Regulação', navSoftware: 'Catálogo de software', navResources: 'Recursos', howToPass: '8 módulos: lição → prática → exame (80%).', passed: 'Aprovado', locked: 'Bloqueado', available: 'Disponível', navMyProgress: 'Meu progresso' });
 
 function t(lang: Lang, key: UiKey): string {
   const pack = (UI as Record<string, Partial<Record<UiKey, string>>>)[lang];
@@ -478,68 +485,44 @@ function getCaseCatLabel(lang: Lang, cat: CaseCategory): string {
 
 const MODULE_I18N: Record<string, Record<string, { title: string; subtitle: string }>> = {
   en: {
-    m1: { title: 'Module 1: Financial Crime Basics', subtitle: 'AML, KYC, CTF, FATF — foundation' },
-    m2: { title: 'Module 2: Due Diligence & PEP', subtitle: 'CDD, EDD, PEP, UBO, SOF/SOW' },
-    m3: { title: 'Module 3: Sanctions Screening', subtitle: 'Hit, true match, false positive, OFAC' },
-    m4: { title: 'Module 4: Transaction Monitoring', subtitle: 'Alerts, red flags, structuring, mules' },
-    m5: { title: 'Module 5: Investigations & SAR', subtitle: 'RFI, escalation, audit trail, tipping off' },
-    m6: { title: 'Module 6: OSINT & Adverse Media', subtitle: 'Open sources, EDD research, UBO' },
-    m7: { title: 'Module 7: Fraud', subtitle: 'ATO, APP, mule, chargeback' },
-    m8: { title: 'Module 8: Crypto & Digital Assets', subtitle: 'VASP, Travel Rule, blockchain AML' },
-    m9: { title: 'Module 9: Trade-Based ML', subtitle: 'TBML, over/under-invoicing' },
-    m10: { title: 'Module 10: High-Risk Industries', subtitle: 'MSB, cash, HRJ, real estate' },
-    m11: { title: 'Module 11: Documentation & QA', subtitle: 'Case notes, audit trail, QA review' },
-    m12: { title: 'Module 12: Governance & Audit', subtitle: 'Three lines, MLRO, regulatory exams' },
-    m13: { title: 'Module 13: Predicate Offences', subtitle: 'Corruption, drugs, tax evasion' },
-    m14: { title: 'Module 14: Job Ready & Career', subtitle: 'CV, interview, CAMS, all paths' },
+    m1: { title: 'Module 1: Introduction to AML/CFT', subtitle: 'Who is an AML analyst' },
+    m2: { title: 'Module 2: KYC, CDD, EDD, SDD', subtitle: 'How customers are verified' },
+    m3: { title: 'Module 3: Screening & monitoring', subtitle: 'Sanctions, PEP, adverse media, red flags' },
+    m4: { title: 'Module 4: EDD investigations', subtitle: 'End-to-end case work' },
+    m5: { title: 'Module 5: Reporting & regulators', subtitle: 'SAR, MLRO, FIU requests' },
+    m6: { title: 'Module 6: Crypto, AI & sanctions', subtitle: 'Modern threats' },
+    m7: { title: 'Module 7: Day-to-day AML work', subtitle: 'Alerts, teams, communication' },
+    m8: { title: 'Module 8: Career in AML', subtitle: 'CV, interview, certifications' },
   },
   lt: {
-    m1: { title: 'Modulis 1: Financial Crime pagrindai', subtitle: 'AML, KYC, CTF, FATF' },
-    m2: { title: 'Modulis 2: Due Diligence ir PEP', subtitle: 'CDD, EDD, PEP, UBO' },
-    m3: { title: 'Modulis 3: Sanctions Screening', subtitle: 'Hit, true match, OFAC' },
-    m4: { title: 'Modulis 4: Transaction Monitoring', subtitle: 'Alerts, red flags' },
-    m5: { title: 'Modulis 5: Tyrimai ir SAR', subtitle: 'RFI, escalation, audit trail' },
-    m6: { title: 'Modulis 6: OSINT & Adverse Media', subtitle: 'Atviri šaltiniai, EDD' },
-    m7: { title: 'Modulis 7: Fraud', subtitle: 'ATO, APP, mule' },
-    m8: { title: 'Modulis 8: Crypto', subtitle: 'VASP, Travel Rule' },
-    m9: { title: 'Modulis 9: Trade-Based ML', subtitle: 'TBML' },
-    m10: { title: 'Modulis 10: High-Risk Industries', subtitle: 'MSB, cash, HRJ' },
-    m11: { title: 'Modulis 11: Dokumentacija ir QA', subtitle: 'Case notes, audit trail' },
-    m12: { title: 'Modulis 12: Governance & Audit', subtitle: 'MLRO, QA' },
-    m13: { title: 'Modulis 13: Predicate Offences', subtitle: 'Corruption, drugs' },
-    m14: { title: 'Modulis 14: Job Ready', subtitle: 'CV, CAMS, karjera' },
+    m1: { title: 'Modulis 1: Įvadas į AML/CFT', subtitle: 'Kas yra AML analitikas' },
+    m2: { title: 'Modulis 2: KYC, CDD, EDD, SDD', subtitle: 'Klientų tikrinimas' },
+    m3: { title: 'Modulis 3: Screening ir monitoringas', subtitle: 'Sankcijos, PEP, red flags' },
+    m4: { title: 'Modulis 4: EDD tyrimai', subtitle: 'Pilnas case workflow' },
+    m5: { title: 'Modulis 5: Ataskaitos ir reguliatoriai', subtitle: 'SAR, MLRO, FIU' },
+    m6: { title: 'Modulis 6: Kripto, AI ir sankcijos', subtitle: 'Šiuolaikinės grėsmės' },
+    m7: { title: 'Modulis 7: AML kasdienybė', subtitle: 'Alertai, komandos' },
+    m8: { title: 'Modulis 8: Karjera AML', subtitle: 'CV, interviu, sertifikatai' },
   },
   uk: {
-    m1: { title: 'Модуль 1: Основи Financial Crime', subtitle: 'AML, KYC, CTF, FATF' },
-    m2: { title: 'Модуль 2: Due Diligence та PEP', subtitle: 'CDD, EDD, PEP, UBO' },
-    m3: { title: 'Модуль 3: Sanctions Screening', subtitle: 'Hit, true match, OFAC' },
-    m4: { title: 'Модуль 4: Transaction Monitoring', subtitle: 'Alerts, red flags' },
-    m5: { title: 'Модуль 5: Розслідування та SAR', subtitle: 'RFI, escalation' },
-    m6: { title: 'Модуль 6: OSINT & Adverse Media', subtitle: 'Відкриті джерела, EDD' },
-    m7: { title: 'Модуль 7: Fraud', subtitle: 'ATO, APP, mule' },
-    m8: { title: 'Модуль 8: Crypto', subtitle: 'VASP, Travel Rule' },
-    m9: { title: 'Модуль 9: Trade-Based ML', subtitle: 'TBML' },
-    m10: { title: 'Модуль 10: High-Risk Industries', subtitle: 'MSB, cash, HRJ' },
-    m11: { title: 'Модуль 11: Документування та QA', subtitle: 'Case notes, audit trail' },
-    m12: { title: 'Модуль 12: Governance & Audit', subtitle: 'MLRO, QA' },
-    m13: { title: 'Модуль 13: Predicate Offences', subtitle: 'Corruption, drugs' },
-    m14: { title: 'Модуль 14: Job Ready', subtitle: 'CV, CAMS, кар\'єра' },
+    m1: { title: 'Модуль 1: Вступ до AML/CFT', subtitle: 'Хто такий AML-аналітик' },
+    m2: { title: 'Модуль 2: KYC, CDD, EDD, SDD', subtitle: 'Перевірка клієнтів' },
+    m3: { title: 'Модуль 3: Скринінг і моніторинг', subtitle: 'Санкції, PEP, red flags' },
+    m4: { title: 'Модуль 4: EDD-розслідування', subtitle: 'Повний цикл кейсу' },
+    m5: { title: 'Модуль 5: Звітність і регулятори', subtitle: 'SAR, MLRO, FIU' },
+    m6: { title: 'Модуль 6: Крипто, ШІ і санкції', subtitle: 'Сучасні загрози' },
+    m7: { title: 'Модуль 7: Робота AML-фахівця', subtitle: 'Алерти, команди' },
+    m8: { title: 'Модуль 8: Кар\'єра в AML', subtitle: 'CV, співбесіда' },
   },
   pl: {
-    m1: { title: 'Moduł 1: Podstawy Financial Crime', subtitle: 'AML, KYC, CTF, FATF' },
-    m2: { title: 'Moduł 2: Due Diligence i PEP', subtitle: 'CDD, EDD, PEP, UBO' },
-    m3: { title: 'Moduł 3: Sanctions Screening', subtitle: 'Hit, true match, OFAC' },
-    m4: { title: 'Moduł 4: Transaction Monitoring', subtitle: 'Alerts, red flags' },
-    m5: { title: 'Moduł 5: Dochodzenia i SAR', subtitle: 'RFI, escalation' },
-    m6: { title: 'Moduł 6: OSINT & Adverse Media', subtitle: 'Źródła otwarte, EDD' },
-    m7: { title: 'Moduł 7: Fraud', subtitle: 'ATO, APP, mule' },
-    m8: { title: 'Moduł 8: Crypto', subtitle: 'VASP, Travel Rule' },
-    m9: { title: 'Moduł 9: Trade-Based ML', subtitle: 'TBML' },
-    m10: { title: 'Moduł 10: High-Risk Industries', subtitle: 'MSB, cash, HRJ' },
-    m11: { title: 'Moduł 11: Dokumentacja i QA', subtitle: 'Case notes, audit trail' },
-    m12: { title: 'Moduł 12: Governance & Audit', subtitle: 'MLRO, QA' },
-    m13: { title: 'Moduł 13: Predicate Offences', subtitle: 'Corruption, drugs' },
-    m14: { title: 'Moduł 14: Job Ready', subtitle: 'CV, CAMS, kariera' },
+    m1: { title: 'Moduł 1: Wprowadzenie do AML/CFT', subtitle: 'Kim jest analityk AML' },
+    m2: { title: 'Moduł 2: KYC, CDD, EDD, SDD', subtitle: 'Weryfikacja klientów' },
+    m3: { title: 'Moduł 3: Screening i monitoring', subtitle: 'Sankcje, PEP, red flags' },
+    m4: { title: 'Moduł 4: Dochodzenia EDD', subtitle: 'Pełny workflow case' },
+    m5: { title: 'Moduł 5: Raportowanie i regulatorzy', subtitle: 'SAR, MLRO, FIU' },
+    m6: { title: 'Moduł 6: Krypto, AI i sankcje', subtitle: 'Nowoczesne zagrożenia' },
+    m7: { title: 'Moduł 7: Codzienna praca AML', subtitle: 'Alerty, zespoły' },
+    m8: { title: 'Moduł 8: Kariera w AML', subtitle: 'CV, rozmowa kwalifikacyjna' },
   },
 };
 
@@ -1672,365 +1655,8 @@ const CRYPTO_CHECKS: CryptoCheckStep[] = [
   { id: 'cc10', step: 10, title: 'Decision & Reporting', action: 'Document: exposure %, hops, tools used, decision (approve/hold/EDD/SAR/offboard). No tipping off.', tools: ['Hummingbird', 'Case system', 'goAML connector'], redFlags: ['Undocumented approval of high-risk wallet'], analystTip: 'Screenshot blockchain graph → attach to case → MLRO review if SAR threshold met.' },
 ];
 
-const MODULES: Module[] = [
-  {
-    id: 'm1',
-    title: 'Модуль 1: Основы Financial Crime',
-    subtitle: 'AML, KYC, CTF, FATF — фундамент профессии',
-    passScore: 4,
-    termIds: ['aml', 'kyc', 'ctf', 'fatf', 'fiu', 'cdd', 'edd', 'risk-score'],
-    lessons: [
-      {
-        title: 'Зачем существует AML — простыми словами',
-        body: `### Что такое «грязные деньги»
-Преступники зарабатывают на наркотиках, мошенничестве, взятках, киберкраже. Эти деньги нельзя просто потратить — банк спросит «откуда?». Поэтому преступники **прогоняют** суммы через счета, компании, крипту, чтобы деньги выглядели «чистыми».
-
-### Зачем нужен банк и финтех
-Банк, платёжка и биржа — главные «ворота» в финансовую систему. Закон обязывает их **видеть подозрительное** и сообщать государству. Ты — тот, кто это замечает и документирует.
-
-### Твоя роль аналитика (не детектив и не судья)
-Ты не доказываешь вину. Ты отвечаешь на вопрос: «Есть ли **обоснованное подозрение**, что деньги связаны с преступлением?» Если да — готовишь материалы для SAR. Если нет — закрываешь кейс с **audit trail** (записью всех шагов).
-
-### Пример для новичка
-Клиент — студент. За месяц прошло 180 000 EUR. Зарплаты такой нет → **несоответствие профилю** (inconsistent profile). Ты не говоришь «он преступник». Ты: собираешь факты → задаёшь RFI → оцениваешь ответ → решаешь: закрыть / EDD / SAR.
-
-### Три стадии отмывания (запомни навсегда)
-- **Placement** — ввод cash/средств в систему
-- **Layering** — запутывание (много переводов, страны, посредники)
-- **Integration** — «легальная» трата (недвижимость, бизнес)
-
-### Мини-чеклист новичка
-- Смотри на профиль клиента vs оборот
-- Каждое решение — письменно в case notes
-- Никогда не намекай клиенту о SAR (**tipping off** — уголовная ответственность)`,
-      },
-      {
-        title: 'KYC, CDD и EDD — в чём разница',
-        body: `### KYC (Know Your Customer)
-**Принцип:** «Знай, с кем работаешь». Это не одна проверка при открытии счёта, а **постоянный процесс**: кто клиент, чем занимается, откуда деньги, какой риск.
-
-### CDD (Customer Due Diligence) — стандартная проверка
-Для **обычного** риска: паспорт/ID, адрес, цель счёта, базовый screening (санкции/PEP). Достаточно для low/medium risk retail-клиента.
-
-### EDD (Enhanced Due Diligence) — усиленная проверка
-Когда риск **выше нормы**: PEP, офшор, adverse media, крупные суммы, high-risk jurisdiction. Нужно больше: SOW/SOF, UBO, контракты, OSINT, одобрение senior/MLRO.
-
-### Как выбирают уровень
-**Risk score** банка (1–100): страна, продукт, канал, поведение. Low → CDD. High → EDD + чаще пересмотр.
-
-### Пример
-Обычный фрилансер из EU → CDD. Депутат + переводы из ОАЭ → EDD + ongoing monitoring.
-
-### Ошибка новичка
-Думать, что KYC = «один раз загрузил паспорт и забыл». На работе KYC **живёт постоянно** — при изменении данных, алертах, пересмотре риска.`,
-      },
-      {
-        title: 'FATF, FIU и SAR — как устроена система',
-        body: `### FATF — «глобальный учебник»
-Financial Action Task Force — 40 рекомендаций, которые страны переносят в свои законы. Если банк просит «SOF» или «UBO» — это часто след FATF R.10, R.24.
-
-### FIU (Financial Intelligence Unit)
-Государственный орган, который **принимает SAR/STR** и передаёт в правоохранительные органы. Примеры: FinCEN (США), NCA (UK), FIU Latvia.
-
-### SAR / STR — что ты готовишь
-**Suspicious Activity Report** — отчёт о **подозрении**, не о доказанной преступности. Формулировка: факты, red flags, что проверял, почему объяснение не убедило.
-
-### Цепочка в банке
-Analyst → MLRO (одобрение) → FIU. Клиент **не узнаёт** о SAR (tipping off запрещён).
-
-### Пример SAR-триггера
-Structuring + high-risk country + клиент не ответил на RFI → обоснованное подозрение → эскалация MLRO → SAR.
-
-### Для собеседования
-Знай разницу: **CDD vs EDD**, **SAR vs блокировка**, **FIU vs регулятор (FCA, ECB)**.`,
-      },
-    ],
-    exam: [
-      { id: 'm1-q1', question: 'Что такое AML?', options: [{ id: 'a', text: 'Система борьбы с отмыванием денег', correct: true }, { id: 'b', text: 'Программа лояльности банка', correct: false }, { id: 'c', text: 'Автоматическая торговля акциями', correct: false }], explain: 'AML = Anti-Money Laundering.' },
-      { id: 'm1-q2', question: 'Когда нужна EDD вместо CDD?', options: [{ id: 'a', text: 'Для всех клиентов', correct: false }, { id: 'b', text: 'Для PEP и high-risk клиентов', correct: true }, { id: 'c', text: 'Никогда', correct: false }], explain: 'PEP, офшоры, adverse media → EDD.' },
-      { id: 'm1-q3', question: 'Куда подаётся SAR?', options: [{ id: 'a', text: 'В FIU (финансовую разведку)', correct: true }, { id: 'b', text: 'Клиенту на email', correct: false }, { id: 'c', text: 'В HR-отдел', correct: false }], explain: 'SAR → FIU, не клиенту (tipping off!).' },
-      { id: 'm1-q4', question: 'FATF — это:', options: [{ id: 'a', text: 'Международный стандарт AML', correct: true }, { id: 'b', text: 'Банковская CRM', correct: false }, { id: 'c', text: 'Криптобиржа', correct: false }], explain: '40 рекомендаций FATF = основа compliance.' },
-      { id: 'm1-q5', question: 'Risk Score определяет:', options: [{ id: 'a', text: 'Уровень проверки клиента', correct: true }, { id: 'b', text: 'Процент кешбэка', correct: false }, { id: 'c', text: 'Курс валюты', correct: false }], explain: 'Low → CDD, High → EDD.' },
-    ],
-    practiceCaseId: 'case-001',
-  },
-  {
-    id: 'm2',
-    title: 'Модуль 2: Due Diligence и PEP',
-    subtitle: 'CDD, EDD, PEP, UBO, SOF/SOW',
-    passScore: 4,
-    termIds: ['pep', 'ubo', 'sof', 'cdd', 'edd'],
-    lessons: [
-      { title: 'PEP — кто это и почему важно', body: 'PEP = Politically Exposed Person. Министры, судьи, главы госорганов + их семья. Риск корruption/bribery. Любой PEP → EDD + ongoing monitoring.' },
-      { title: 'UBO — найди реального владельца', body: 'Компания может иметь 5 офшорных «прокладок». UBO — человек с >25% или контролем. Без UBO ты не знаешь, с кем работаешь. OSINT + OpenCorporates — твои инструменты.' },
-      { title: 'Source of Funds vs Source of Wealth', body: 'SOF — откуда конкретные деньги в этой транзакции. SOW — как клиент накопил состояние. Оба критичны для EDD.' },
-    ],
-    exam: [
-      { id: 'm2-q1', question: 'Депутат местного совета — это:', options: [{ id: 'a', text: 'PEP → EDD', correct: true }, { id: 'b', text: 'Обычный клиент → CDD', correct: false }, { id: 'c', text: 'Не проверяется', correct: false }], explain: 'Любой PEP = EDD.' },
-      { id: 'm2-q2', question: 'UBO — это:', options: [{ id: 'a', text: 'Конечный бенефициар компании', correct: true }, { id: 'b', text: 'Главный бухгалтер', correct: false }, { id: 'c', text: 'IT-администратор', correct: false }], explain: 'Ultimate Beneficial Owner.' },
-      { id: 'm2-q3', question: 'SOF означает:', options: [{ id: 'a', text: 'Источник конкретных средств', correct: true }, { id: 'b', text: 'Систему мониторинга', correct: false }, { id: 'c', text: 'Санкционный список', correct: false }], explain: 'Source of Funds.' },
-      { id: 'm2-q4', question: 'Adverse media о закрытом деле без обвинений:', options: [{ id: 'a', text: 'Medium risk, не auto-decline', correct: true }, { id: 'b', text: 'Auto-reject', correct: false }, { id: 'c', text: 'Игнорировать', correct: false }], explain: 'Оцениваешь контекст и свежесть.' },
-      { id: 'm2-q5', question: 'Для EDD PEP нужны:', options: [{ id: 'a', text: 'SOW, UBO, контракты, CV, PEP declaration', correct: true }, { id: 'b', text: 'Только паспорт', correct: false }, { id: 'c', text: 'Ничего дополнительного', correct: false }], explain: 'Полный пакет документов.' },
-    ],
-    practiceCaseId: 'case-002',
-  },
-  {
-    id: 'm3',
-    title: 'Модуль 3: Sanctions Screening',
-    subtitle: 'Hit, true match, false positive, OFAC',
-    passScore: 4,
-    termIds: ['sanctions', 'ofac', 'hit', 'true-match', 'false-positive', 'fuzzy'],
-    lessons: [
-      { title: 'Как работает sanctions screening', body: 'Каждый клиент и контрагент сверяется с OFAC SDN, EU, UN, UK списками. Совпадение = hit. Твоя задача — определить true match или false positive.' },
-      { title: 'Fuzzy matching', body: 'Ivan Ivanov ≈ I. Ivanov ≈ Иван Иванов. Алгоритм даёт % совпадения. 87% ≠ автоматический true match. Сверяй DOB, паспорт, адрес, гражданство, фото.' },
-      { title: 'True match vs False positive', body: 'True match → блокировка + SAR + эскалация MLRO. False positive → документируешь почему (разный DOB/паспорт) и закрываешь. Ошибка в любую сторону = серьёзные последствия.' },
-    ],
-    exam: [
-      { id: 'm3-q1', question: 'Hit при 87% match и разном паспорте:', options: [{ id: 'a', text: 'Дополнительная сверка, не auto-close', correct: true }, { id: 'b', text: 'Сразу false positive', correct: false }, { id: 'c', text: 'Игнорировать', correct: false }], explain: 'Нужна полная верификация.' },
-      { id: 'm3-q2', question: 'OFAC SDN — это:', options: [{ id: 'a', text: 'US санкционный список', correct: true }, { id: 'b', text: 'База PEP', correct: false }, { id: 'c', text: 'Криптокошелёк', correct: false }], explain: 'Specially Designated Nationals.' },
-      { id: 'm3-q3', question: 'True match означает:', options: [{ id: 'a', text: 'Подтверждённое совпадение → блокировка', correct: true }, { id: 'b', text: 'Ложное срабатывание', correct: false }, { id: 'c', text: 'Одобрение клиента', correct: false }], explain: 'True match = тот же человек/entity.' },
-      { id: 'm3-q4', question: 'False positive — это:', options: [{ id: 'a', text: 'Hit, но другой человек', correct: true }, { id: 'b', text: 'Подтверждённый санкционный клиент', correct: false }, { id: 'c', text: 'Тип алерта TM', correct: false }], explain: 'Документируешь и закрываешь.' },
-      { id: 'm3-q5', question: 'При sanctions hit сверяешь:', options: [{ id: 'a', text: 'DOB, паспорт, адрес, гражданство', correct: true }, { id: 'b', text: 'Только имя', correct: false }, { id: 'c', text: 'Только email', correct: false }], explain: 'Максимум идентификаторов.' },
-    ],
-    practiceCaseId: 'case-003',
-  },
-  {
-    id: 'm4',
-    title: 'Модуль 4: Transaction Monitoring',
-    subtitle: 'Alerts, red flags, structuring, mule accounts',
-    passScore: 4,
-    termIds: ['tm', 'alert', 'structuring', 'rapid-in-out', 'third-party', 'mule', 'inconsistent', 'dormant', 'hrj', 'layering', 'placement', 'integration'],
-    lessons: [
-      { title: 'Что такое Alert', body: 'Transaction Monitoring автоматически анализирует операции клиента по правилам и ML-моделям. Странный паттерн → alert в очередь аналитика. Ты получаешь alert, собираешь контекст (профиль, история, контрагенты), расследуешь, документируешь решение. 80% рабочего дня TM Analyst — review queue.' },
-      { title: 'Ключевые red flags', body: 'Structuring (9 900 × N), rapid in-out, third-party payments, mule account, inconsistent profile, dormant→active, high-risk jurisdiction. Один флаг — внимание. Комбинация — расследование.' },
-      { title: 'Три стадии отмывания', body: 'Placement (ввод) → Layering (запутывание) → Integration (легализация). TM ловит все три, но layering и rapid movement — самые частые алерты.' },
-    ],
-    exam: [
-      { id: 'm4-q1', question: '15 переводов по 9 800 EUR — это:', options: [{ id: 'a', text: 'Structuring', correct: true }, { id: 'b', text: 'Зарплата', correct: false }, { id: 'c', text: 'False positive', correct: false }], explain: 'Дробление ниже порога.' },
-      { id: 'm4-q2', question: 'Rapid in-out — это:', options: [{ id: 'a', text: 'Деньги быстро проходят через счёт', correct: true }, { id: 'b', text: 'Медленный перевод', correct: false }, { id: 'c', text: 'Закрытие счёта', correct: false }], explain: 'Признак mule/layering.' },
-      { id: 'm4-q3', question: 'Third-party payments:', options: [{ id: 'a', text: 'Платежи, не связанные с профилем клиента', correct: true }, { id: 'b', text: 'Платежи самому себе', correct: false }, { id: 'c', text: 'Зарплата от работодателя', correct: false }], explain: 'Red flag для mule.' },
-      { id: 'm4-q4', question: 'Alert — это:', options: [{ id: 'a', text: 'Сигнал TM о подозрительной активности', correct: true }, { id: 'b', text: 'Одобрение транзакции', correct: false }, { id: 'c', text: 'Маркeting email', correct: false }], explain: 'Начало расследования.' },
-      { id: 'm4-q5', question: 'Студент с 180K оборотом — это:', options: [{ id: 'a', text: 'Inconsistent profile', correct: true }, { id: 'b', text: 'Нормальный профиль', correct: false }, { id: 'c', text: 'Low risk', correct: false }], explain: 'Доход ≠ оборот.' },
-    ],
-    practiceCaseId: 'case-004',
-  },
-  {
-    id: 'm5',
-    title: 'Модуль 5: Расследования и SAR',
-    subtitle: 'RFI, escalation, audit trail, tipping off',
-    passScore: 4,
-    termIds: ['rfi', 'sar', 'escalation', 'mlro', 'audit-trail', 'rfi-deadline'],
-    lessons: [
-      { title: 'Цепочка расследования alert', body: 'Alert → сбор контекста (профиль, история) → анализ red flags → RFI клиенту → оценка ответа → SAR или закрытие с audit trail.' },
-      { title: 'RFI — как задавать вопросы', body: 'Конкретно: «Объясните 12 переводов по 9 900 EUR от 12 физлиц за 2 недели». Нельзя намекать на SAR (tipping off — уголовка).' },
-      { title: 'Когда подавать SAR', body: 'Обоснованное подозрение + нет правдоподобного объяснения. SAR готовит аналитик → одобряет MLRO → FIU. Каждый шаг в audit trail.' },
-    ],
-    exam: [
-      { id: 'm5-q1', question: 'RFI — это:', options: [{ id: 'a', text: 'Запрос информации у клиента', correct: true }, { id: 'b', text: 'Отчёт регулятору', correct: false }, { id: 'c', text: 'Блокировка счёта', correct: false }], explain: 'Request for Information.' },
-      { id: 'm5-q2', question: 'Tipping off — это:', options: [{ id: 'a', text: 'Предупреждение клиента о SAR (запрещено)', correct: true }, { id: 'b', text: 'Чаевые', correct: false }, { id: 'c', text: 'Эскалация MLRO', correct: false }], explain: 'Нельзя говорить клиенту о подозрении.' },
-      { id: 'm5-q3', question: 'Audit trail нужен для:', options: [{ id: 'a', text: 'Документирования каждого шага', correct: true }, { id: 'b', text: 'Маркетинга', correct: false }, { id: 'c', text: 'Удаления данных', correct: false }], explain: 'Без audit trail = нарушение.' },
-      { id: 'm5-q4', question: 'MLRO — это:', options: [{ id: 'a', text: 'Compliance-офицер, одобряющий SAR', correct: true }, { id: 'b', text: 'Клиент банка', correct: false }, { id: 'c', text: 'IT-специалист', correct: false }], explain: 'Money Laundering Reporting Officer.' },
-      { id: 'm5-q5', question: 'Structuring + HRJ + weak RFI response →', options: [{ id: 'a', text: 'SAR / эскалация', correct: true }, { id: 'b', text: 'Закрыть без документов', correct: false }, { id: 'c', text: 'Игнорировать', correct: false }], explain: 'Комбинация red flags + слабое объяснение.' },
-    ],
-    practiceCaseId: 'case-005',
-  },
-  {
-    id: 'm6',
-    title: 'Модуль 6: Adverse Media & OSINT',
-    subtitle: 'Медиа-скрининг, OSINT-расследования, EDD research',
-    passScore: 4,
-    termIds: ['adverse', 'ubo', 'sof'],
-    lessons: [
-      { title: 'Adverse media screening', body: 'Источники: Google, специализированные медиа-базы, локальные СМИ, судебные реестры, корпоративные архивы. Оцениваешь: свежесть, серьёзность, статус (convicted/acquitted/ongoing), надёжность источника. OSINT-навыки = прямое преимущество на EDD.' },
-      { title: 'OSINT в EDD', body: 'Корпоративные реестры (OpenCorporates, Companies House), LinkedIn, соцсети, Panama Papers-style leaks, спутниковые снимки (Bellingcat). Цель: подтвердить или опровергнуть профиль клиента.' },
-      { title: 'Написание OSINT-отчёта', body: 'Структура: Executive Summary → Sources → Findings → Risk Assessment → Recommendation. Каждый факт = источник + дата. Без домыслов. Это формат EDD report в банке.' },
-    ],
-    exam: [
-      { id: 'm6-q1', question: 'Adverse media — одна статья о закрытом деле:', options: [{ id: 'a', text: 'Medium risk, контекст важен', correct: true }, { id: 'b', text: 'Auto-reject', correct: false }, { id: 'c', text: 'Игнорировать', correct: false }], explain: 'Оцениваешь вес и свежесть.' },
-      { id: 'm6-q2', question: 'OSINT в EDD используется для:', options: [{ id: 'a', text: 'Верификации UBO и фактов о клиенте', correct: true }, { id: 'b', text: 'Маркетинга', correct: false }, { id: 'c', text: 'HR', correct: false }], explain: 'Подтверждение/опровержение профиля.' },
-      { id: 'm6-q3', question: 'EDD report должен содержать:', options: [{ id: 'a', text: 'Источники для каждого факта', correct: true }, { id: 'b', text: 'Только мнение', correct: false }, { id: 'c', text: 'Только паспорт', correct: false }], explain: 'Source attribution обязателен.' },
-      { id: 'm6-q4', question: 'OpenCorporates — это:', options: [{ id: 'a', text: 'Глобальный реестр компаний', correct: true }, { id: 'b', text: 'Санкционный список', correct: false }, { id: 'c', text: 'TM система', correct: false }], explain: 'Для UBO и corporate structure.' },
-      { id: 'm6-q5', question: 'Лучший OSINT-навык для AML:', options: [{ id: 'a', text: 'Cross-referencing open sources', correct: true }, { id: 'b', text: 'Видеомонтаж', correct: false }, { id: 'c', text: 'Excel макросы', correct: false }], explain: 'Сверка фактов из разных источников.' },
-    ],
-    practiceCaseId: 'case-154',
-  },
-  {
-    id: 'm7',
-    title: 'Модуль 7: Fraud & Scam Typologies',
-    subtitle: 'Payment fraud, ATO, romance scam, APP fraud',
-    passScore: 4,
-    termIds: ['mule', 'third-party', 'inconsistent'],
-    lessons: [
-      { title: 'Fraud vs AML', body: 'Fraud — потеря денег банка/клиента (chargeback, scam). AML — отмывание преступных доходов. Пересечение: mule accounts, scam proceeds. Крупные финтехи имеют отдельные Fraud и AML команды, но кейсы пересекаются.' },
-      { title: 'Account Takeover (ATO)', body: 'Злоумышленник получает доступ к аккаунту. Признаки: смена email/phone, новое устройство, IP из другой страны, срочные переводы. TM + fraud rules ловят вместе.' },
-      { title: 'APP Fraud & Social Engineering', body: 'Authorized Push Payment — клиент сам отправляет деньги мошеннику. Romance scam, investment scam, impersonation. Сложно: клиент «согласен». RFI + education + SAR если proceeds от других жертв.' },
-    ],
-    exam: [
-      { id: 'm7-q1', question: 'Mule account чаще связан с:', options: [{ id: 'a', text: 'Fraud + AML (transit funds)', correct: true }, { id: 'b', text: 'Только маркетингом', correct: false }, { id: 'c', text: 'Зарплатным проектом', correct: false }], explain: 'Прокладка для fraud proceeds.' },
-      { id: 'm7-q2', question: 'ATO — это:', options: [{ id: 'a', text: 'Захват аккаунта злоумышленником', correct: true }, { id: 'b', text: 'Новый клиент', correct: false }, { id: 'c', text: 'Санкции', correct: false }], explain: 'Account Takeover.' },
-      { id: 'm7-q3', question: 'APP fraud — клиент:', options: [{ id: 'a', text: 'Сам авторизует перевод мошеннику', correct: true }, { id: 'b', text: 'Не знает о переводе', correct: false }, { id: 'c', text: 'Получает зарплату', correct: false }], explain: 'Authorized Push Payment.' },
-      { id: 'm7-q4', question: 'Chargeback относится к:', options: [{ id: 'a', text: 'Card fraud / disputes', correct: true }, { id: 'b', text: 'Sanctions', correct: false }, { id: 'c', text: 'PEP screening', correct: false }], explain: 'Оспаривание карточного платежа.' },
-      { id: 'm7-q5', question: 'Студент с 40 входящими от незнакомых — типично:', options: [{ id: 'a', text: 'Mule / money laundering', correct: true }, { id: 'b', text: 'Нормальный студент', correct: false }, { id: 'c', text: 'PEP', correct: false }], explain: 'Классический mule pattern.' },
-    ],
-    practiceCaseId: 'case-091',
-  },
-  {
-    id: 'm8',
-    title: 'Модуль 8: Crypto & Digital Assets',
-    subtitle: 'VASP, Travel Rule, blockchain AML',
-    passScore: 4,
-    termIds: ['vasp', 'travel-rule', 'mixer', 'kyt', 'chain-hopping', 'defi', 'unhosted', 'layering'],
-    lessons: [
-      { title: 'Crypto в AML', body: 'FATF Travel Rule: передача sender/receiver info при crypto transfers ≥ threshold. VASP = лицензируемые биржи и custodial wallets. Mixers/tumblers = extreme red flag. Blockchain analytics — отслеживание источника средств on-chain. См. опциональный раздел «Crypto AML — 10 шагов» в меню.' },
-      { title: 'Crypto red flags', body: 'Rapid conversion fiat→crypto→withdrawal. Privacy coins (Monero). DeFi без KYC. Unhosted wallets. Chain-hopping через bridges. KYT alerts обрабатываются как TM alerts. Практика — в полигоне (категории Crypto + DeFi).' },
-      { title: '10 шагов crypto-проверки', body: '1 VASP ID → 2 Travel Rule → 3 Wallet screening → 4 Trace → 5 Mixer detection → 6 Sanctions → 7 SOF → 8 DeFi EDD → 9 Fiat-crypto correlation → 10 Decision/SAR. Каждый шаг — в разделе Crypto AML.' },
-    ],
-    exam: [
-      { id: 'm8-q1', question: 'Travel Rule — это:', options: [{ id: 'a', text: 'Передача данных отправителя/получателя crypto', correct: true }, { id: 'b', text: 'Туристическая виза', correct: false }, { id: 'c', text: 'Sanctions list', correct: false }], explain: 'FATF Recommendation 16.' },
-      { id: 'm8-q2', question: 'Mixer/tumbler — это:', options: [{ id: 'a', text: 'Extreme red flag (обфускация)', correct: true }, { id: 'b', text: 'Нормальный сервис', correct: false }, { id: 'c', text: 'Банковский продукт', correct: false }], explain: 'Запутывание blockchain trail.' },
-      { id: 'm8-q3', question: 'Fiat → crypto → быстрый вывод — похоже на:', options: [{ id: 'a', text: 'Rapid in-out / layering', correct: true }, { id: 'b', text: 'Зарплату', correct: false }, { id: 'c', text: 'CDD only', correct: false }], explain: 'Классический ML через crypto.' },
-      { id: 'm8-q4', question: 'VASP — это:', options: [{ id: 'a', text: 'Лицензируемый crypto-провайдер', correct: true }, { id: 'b', text: 'Вид паспорта', correct: false }, { id: 'c', text: 'Sanctions hit', correct: false }], explain: 'Virtual Asset Service Provider.' },
-      { id: 'm8-q5', question: 'Blockchain analytics нужен для:', options: [{ id: 'a', text: 'Отслеживания источника crypto', correct: true }, { id: 'b', text: 'HR', correct: false }, { id: 'c', text: 'Marketing', correct: false }], explain: 'On-chain OSINT для crypto AML.' },
-    ],
-    practiceCaseId: 'case-112',
-  },
-  {
-    id: 'm9',
-    title: 'Модуль 9: Trade-Based Money Laundering',
-    subtitle: 'Over/under-invoicing, trade finance, customs',
-    passScore: 4,
-    termIds: ['layering', 'placement', 'integration'],
-    lessons: [
-      { title: 'Что такое Trade-Based ML', body: 'Манипуляция торговыми сделками: over-invoicing (завышение), under-invoicing (занижение), multiple invoicing, phantom shipping. Сложно детектить — «легальные» документы.' },
-      { title: 'Red flags в торговле', body: 'Invoice value ≠ market price. Shipping docs не соответствуют goods. High-risk corridors (UAE, HK, Panama). Shell trading companies. Расхождение customs vs bank payments.' },
-      { title: 'Роль compliance analyst', body: 'Сверка: invoice, contract, bill of lading, customs declaration, bank payment. OSINT: рыночные цены, реестры компаний. Эскалация в trade finance team.' },
-    ],
-    exam: [
-      { id: 'm9-q1', question: 'Over-invoicing — это:', options: [{ id: 'a', text: 'Завышение цены в инвойсе для вывода денег', correct: true }, { id: 'b', text: 'Скидка', correct: false }, { id: 'c', text: 'Зарплата', correct: false }], explain: 'Trade-based ML метод.' },
-      { id: 'm9-q2', question: 'Расхождение customs и bank payments:', options: [{ id: 'a', text: 'Red flag для trade ML', correct: true }, { id: 'b', text: 'Норма', correct: false }, { id: 'c', text: 'PEP', correct: false }], explain: 'Несоответствие документов.' },
-      { id: 'm9-q3', question: 'Phantom shipping — это:', options: [{ id: 'a', text: 'Фиктивная поставка товара', correct: true }, { id: 'b', text: 'Быстрая доставка', correct: false }, { id: 'c', text: 'Sanctions', correct: false }], explain: 'Товар не существует.' },
-      { id: 'm9-q4', question: 'Trade finance monitoring включает:', options: [{ id: 'a', text: 'Invoice, B/L, customs, payments', correct: true }, { id: 'b', text: 'Только паспорт', correct: false }, { id: 'c', text: 'Только PEP', correct: false }], explain: 'Полный пакет документов.' },
-      { id: 'm9-q5', question: 'Shell trading company — риск:', options: [{ id: 'a', text: 'High — проверить UBO и substance', correct: true }, { id: 'b', text: 'Low always', correct: false }, { id: 'c', text: 'No risk', correct: false }], explain: 'Часто используется в TBML.' },
-    ],
-    practiceCaseId: 'case-006',
-  },
-  {
-    id: 'm10',
-    title: 'Модуль 10: High-Risk Industries & Products',
-    subtitle: 'Cash-intensive, gambling, real estate, MSB',
-    passScore: 4,
-    termIds: ['hrj', 'risk-score', 'edd'],
-    lessons: [
-      { title: 'High-risk отрасли', body: 'Cash-intensive: casinos, nail salons, car wash. MSB (money service business). Gambling/betting. Precious metals. Real estate. Crypto. Art/antiques. Автоматически повышенный risk score.' },
-      { title: 'Real estate ML', body: 'Dubai, London, Miami — классика. Покупка недвижимости на третье лицо. Быстрая перепродажа. Оплата cash/crypto. DNFBP (юристы, риелторы) тоже под AML.' },
-      { title: 'Risk-based approach (RBA)', body: 'FATF: не все клиенты одинаковы. Low risk = simplified (редко). Medium = CDD. High = EDD. Industry + geography + product + channel = risk score.' },
-    ],
-    exam: [
-      { id: 'm10-q1', question: 'DNFBP — это:', options: [{ id: 'a', text: 'Юристы, риелторы, бухгалтеры под AML', correct: true }, { id: 'b', text: 'Банковский отдел', correct: false }, { id: 'c', text: 'IT-команда', correct: false }], explain: 'Designated Non-Financial Businesses.' },
-      { id: 'm10-q2', question: 'Casino / gambling — риск:', options: [{ id: 'a', text: 'High (cash-intensive)', correct: true }, { id: 'b', text: 'Always low', correct: false }, { id: 'c', text: 'No AML', correct: false }], explain: 'Placement через cash.' },
-      { id: 'm10-q3', question: 'RBA означает:', options: [{ id: 'a', text: 'Меры пропорциональны риску клиента', correct: true }, { id: 'b', text: 'Одинаковая проверка для всех', correct: false }, { id: 'c', text: 'Без проверок', correct: false }], explain: 'Risk-Based Approach.' },
-      { id: 'm10-q4', question: 'Real estate в Dubai часто связан с:', options: [{ id: 'a', text: 'Integration stage ML', correct: true }, { id: 'b', text: 'Зарплатами', correct: false }, { id: 'c', text: 'PEP only', correct: false }], explain: 'Легализация через недвижимость.' },
-      { id: 'm10-q5', question: 'MSB — это:', options: [{ id: 'a', text: 'Money Service Business (обмен, переводы)', correct: true }, { id: 'b', text: 'Microsoft', correct: false }, { id: 'c', text: 'Sanctions body', correct: false }], explain: 'Высокий AML-риск.' },
-    ],
-    practiceCaseId: 'case-217',
-  },
-  {
-    id: 'm11',
-    title: 'Модуль 11: Документирование и QA',
-    subtitle: 'Case notes, audit trail, QA review, consistency',
-    passScore: 4,
-    termIds: ['audit-trail', 'rfi', 'escalation'],
-    lessons: [
-      { title: 'Стандарт case notes', body: 'Каждое решение фиксируется: alert ID, дата, аналитик, red flags, проверенные данные, RFI (если был), обоснование, итог (close/escalate/SAR). Регулятор и QA читают case notes — не «закрыл alert», а «почему закрыл». Шаблон: Context → Analysis → Red flags → RFI → Decision → Next steps.' },
-      { title: 'Quality Assurance (QA)', body: 'Senior analyst или QA team выборочно проверяет закрытые кейсы. KPI: consistency, completeness, timeliness. Типичные ошибки новичков: закрытие без RFI, copy-paste обоснований, отсутствие источников в EDD, пропуск комбинации red flags. Rework = возврат на доработку.' },
-      { title: 'Regulatory sample review', body: 'При проверке FCA/FinCEN/Bank of Lithuania запрашивают sample alerts за период. Банк должен показать: policy, alert, investigation, decision, audit trail. Твоё качество документирования = защита institution. MLRO подписывает SAR только при полном case file.' },
-      { title: 'Consistency и timeliness', body: 'SLA на alert review (24–72h в зависимости от priority). Одинаковые паттерны — одинаковые решения (нет «сегодня закрыл, завтра SAR» без причины). Escalation matrix: P1 → MLRO same day, structuring + HRJ → mandatory senior review.' },
-    ],
-    exam: [
-      { id: 'm11-q1', question: 'Case notes должны содержать:', options: [{ id: 'a', text: 'Context, analysis, decision, audit trail', correct: true }, { id: 'b', text: 'Только имя клиента', correct: false }, { id: 'c', text: 'Только дату', correct: false }], explain: 'Полное обоснование каждого шага.' },
-      { id: 'm11-q2', question: 'QA в compliance проверяет:', options: [{ id: 'a', text: 'Качество закрытых кейсов', correct: true }, { id: 'b', text: 'Маркетинг', correct: false }, { id: 'c', text: 'IT-инфраструктуру', correct: false }], explain: 'Quality Assurance выборочный review.' },
-      { id: 'm11-q3', question: 'При regulatory exam запрашивают:', options: [{ id: 'a', text: 'Sample alerts + полный audit trail', correct: true }, { id: 'b', text: 'Только логотип', correct: false }, { id: 'c', text: 'Список сотрудников HR', correct: false }], explain: 'Доказательство compliance.' },
-      { id: 'm11-q4', question: 'Типичная ошибка новичка:', options: [{ id: 'a', text: 'Закрыть alert без документирования RFI', correct: true }, { id: 'b', text: 'Слишком подробный audit trail', correct: false }, { id: 'c', text: 'Эскалация MLRO', correct: false }], explain: 'Incomplete documentation = QA fail.' },
-      { id: 'm11-q5', question: 'Consistency означает:', options: [{ id: 'a', text: 'Одинаковые паттерны → одинаковые решения', correct: true }, { id: 'b', text: 'Разные решения без причины', correct: false }, { id: 'c', text: 'Игнорировать SLA', correct: false }], explain: 'Predictable, defensible outcomes.' },
-    ],
-    practiceCaseId: 'case-049',
-  },
-  {
-    id: 'm12',
-    title: 'Модуль 12: Governance & Audit',
-    subtitle: 'Three lines of defence, MLRO, regulatory exams',
-    passScore: 4,
-    termIds: ['mlro', 'audit-trail', 'escalation'],
-    lessons: [
-      { title: 'Three Lines of Defence', body: '1st: Business (front office) — owns risk. 2nd: Compliance (ты) — policies, monitoring. 3rd: Internal Audit — independent review. Ты во 2-й линии.' },
-      { title: 'Regulatory examinations', body: 'FCA, Bank of Lithuania, FinCEN — могут прийти с проверкой. Запрашивают: policies, sample cases, audit trails, MLRO reports. Качество твоей документации = защита банка.' },
-      { title: 'Quality Assurance (QA)', body: 'Senior analysts проверяют твои закрытые кейсы. QA score — KPI. Плохое обоснование = rework. Consistency критична.' },
-    ],
-    exam: [
-      { id: 'm12-q1', question: 'Compliance analyst — это линия:', options: [{ id: 'a', text: '2nd line of defence', correct: true }, { id: 'b', text: '1st line', correct: false }, { id: 'c', text: '3rd line', correct: false }], explain: 'Risk and compliance function.' },
-      { id: 'm12-q2', question: 'QA в compliance — это:', options: [{ id: 'a', text: 'Проверка качества твоих кейсов', correct: true }, { id: 'b', text: 'Маркетинг', correct: false }, { id: 'c', text: 'Sales', correct: false }], explain: 'Quality Assurance.' },
-      { id: 'm12-q3', question: 'При regulatory exam запрашивают:', options: [{ id: 'a', text: 'Sample cases + audit trails', correct: true }, { id: 'b', text: 'Только логотип', correct: false }, { id: 'c', text: 'Меню кафе', correct: false }], explain: 'Доказательство compliance.' },
-      { id: 'm12-q4', question: 'MLRO отвечает за:', options: [{ id: 'a', text: 'SAR decisions и AML programme', correct: true }, { id: 'b', text: 'IT support', correct: false }, { id: 'c', text: 'Marketing', correct: false }], explain: 'Final SAR authority.' },
-      { id: 'm12-q5', question: 'Плохой audit trail ведёт к:', options: [{ id: 'a', text: 'Regulatory findings и штрафам', correct: true }, { id: 'b', text: 'Премии', correct: false }, { id: 'c', text: 'Ничему', correct: false }], explain: 'Серьёзные последствия.' },
-    ],
-  },
-  {
-    id: 'm13',
-    title: 'Модуль 13: Predicate Offences & Economic Crime',
-    subtitle: 'Коррупция, наркотики, tax evasion, bribery',
-    passScore: 4,
-    termIds: ['placement', 'integration', 'layering'],
-    lessons: [
-      { title: 'Predicate offences', body: 'ML не существует без predicate crime: fraud, drug trafficking, corruption, tax evasion, human trafficking, cybercrime. Ты ищешь следы predicate в транзакциях.' },
-      { title: 'Corruption & Bribery', body: 'FCPA (US), UK Bribery Act. PEP — главный риск. Unusual payments to agents/consultants. Round amounts to offshore. Adverse media о corruption.' },
-      { title: 'Tax evasion как AML', body: 'EU AMLD6: tax crimes = predicate. Необъяснимое богатство, offshore structures, inconsistent tax declarations. Связь с SOW verification.' },
-    ],
-    exam: [
-      { id: 'm13-q1', question: 'Predicate offence — это:', options: [{ id: 'a', text: 'Исходное преступление до отмывания', correct: true }, { id: 'b', text: 'Sanctions hit', correct: false }, { id: 'c', text: 'KYC форма', correct: false }], explain: 'Fraud, drugs, corruption, etc.' },
-      { id: 'm13-q2', question: 'FCPA регулирует:', options: [{ id: 'a', text: 'US anti-bribery / corruption', correct: true }, { id: 'b', text: 'EU sanctions', correct: false }, { id: 'c', text: 'Crypto', correct: false }], explain: 'Foreign Corrupt Practices Act.' },
-      { id: 'm13-q3', question: 'Tax evasion в EU AMLD6:', options: [{ id: 'a', text: 'Predicate offence для ML', correct: true }, { id: 'b', text: 'Не связано', correct: false }, { id: 'c', text: 'Только HR', correct: false }], explain: 'Налоговые преступления = AML.' },
-      { id: 'm13-q4', question: 'Платежи consultant в офшор без договора:', options: [{ id: 'a', text: 'Bribery / corruption red flag', correct: true }, { id: 'b', text: 'Норма', correct: false }, { id: 'c', text: 'Зарплата', correct: false }], explain: 'Схема взяток.' },
-      { id: 'm13-q5', question: 'Drug trafficking ML часто через:', options: [{ id: 'a', text: 'Cash placement + mule accounts', correct: true }, { id: 'b', text: 'Только зарплату', correct: false }, { id: 'c', text: 'PEP only', correct: false }], explain: 'Cash-intensive predicate.' },
-    ],
-    practiceCaseId: 'case-175',
-  },
-  {
-    id: 'm14',
-    title: 'Модуль 14: Job Ready & Career',
-    subtitle: 'Резюме, собеседование, CAMS, все направления',
-    passScore: 4,
-    termIds: [],
-    lessons: [
-      { title: 'Направления карьеры', body: 'KYC Analyst (onboarding), TM Analyst (alerts), Sanctions Analyst (screening), EDD/OSINT Researcher, Fraud Analyst, MLRO support, Quality Assurance. Курс покрывает ВСЕ — ты можешь идти в любое.' },
-      { title: 'OSINT → Compliance CV', body: 'Financial Crime Investigator | AML/KYC Analyst | OSINT & Forensic. Bullet points на английском. CAMS/ICA certification. Навыки: EDD research, adverse media, UBO mapping, TM alert investigation, SAR drafting.' },
-      { title: 'Финальный чеклист', body: `14 модулей ✓ · ${GLOSSARY.length} терминов ✓ · ${REGULATIONS.length} юрисдикций ✓ · English ✓ · OSINT-трек ✓ · ${PRACTICE_CASES.length} кейсов ✓ · финальный экзамен (40+10) ✓ → подавай в банки, финтехи, crypto compliance, Big4 Forensic.` },
-    ],
-    exam: [
-      { id: 'm14-q1', question: 'После курса ты можешь работать как:', options: [{ id: 'a', text: 'KYC / TM / Sanctions / EDD / Fraud analyst', correct: true }, { id: 'b', text: 'Только кассир', correct: false }, { id: 'c', text: 'Только HR', correct: false }], explain: 'Все направления покрыты.' },
-      { id: 'm14-q2', question: 'Лучшая сертификация для AML:', options: [{ id: 'a', text: 'ACAMS (CAMS)', correct: true }, { id: 'b', text: 'PMP', correct: false }, { id: 'c', text: 'AWS', correct: false }], explain: 'Industry gold standard.' },
-      { id: 'm14-q3', question: 'Многие работодатели оплачивают:', options: [{ id: 'a', text: 'ACAMS / ICA сертификацию', correct: true }, { id: 'b', text: 'Отпуск на Луну', correct: false }, { id: 'c', text: 'Netflix', correct: false }], explain: 'CAMS часто в employee benefits.' },
-      { id: 'm14-q4', question: 'OSINT-навык лучше описать как:', options: [{ id: 'a', text: 'EDD research + adverse media + UBO', correct: true }, { id: 'b', text: 'Instagram browsing', correct: false }, { id: 'c', text: 'Gaming', correct: false }], explain: 'Professional language.' },
-      { id: 'm14-q5', question: '14 модулей курса дают:', options: [{ id: 'a', text: '100% coverage профессии Financial Crime', correct: true }, { id: 'b', text: 'Только основы', correct: false }, { id: 'c', text: 'Ничего', correct: false }], explain: 'Полная подготовка.' },
-    ],
-  },
-];
-
-const MODULE_META: Record<string, { objectives: string[]; takeaways: string[]; proTip: string }> = {
-  m1: { objectives: ['Понять роль AML в банке/финтехе', 'Различать KYC, CDD, EDD', 'Знать FATF и FIU'], takeaways: ['AML = защита системы от преступных денег', 'Risk score определяет глубину проверки', 'SAR → FIU, never tipping off'], proTip: 'На интервью начни с risk-based approach — это язык compliance.' },
-  m2: { objectives: ['Идентифицировать PEP', 'Находить UBO', 'Запрашивать SOF/SOW'], takeaways: ['Любой PEP = EDD', 'UBO через корпоративные реестры', 'Adverse media ≠ auto-decline'], proTip: 'OSINT для UBO: OpenCorporates + LinkedIn + local registry.' },
-  m3: { objectives: ['Разбирать sanctions hits', 'Отличать true match от false positive', 'Знать OFAC/EU/UN lists'], takeaways: ['Hit ≠ guilt', 'Fuzzy match требует сверки идентификаторов', 'True match = block + SAR'], proTip: 'Документируй каждый идентификатор при hit resolution.' },
-  m4: { objectives: ['Читать TM alerts', 'Распознавать red flags', 'Понимать 3 стадии ML'], takeaways: ['Structuring = дробление порога', 'Rapid in-out = mule signal', 'Комбинация flags > один flag'], proTip: 'Всегда сравнивай оборот с заявленным доходом.' },
-  m5: { objectives: ['Вести расследование alert', 'Формулировать RFI', 'Готовить SAR'], takeaways: ['Alert → context → RFI → decision', 'Audit trail обязателен', 'MLRO одобряет SAR'], proTip: 'RFI конкретный: суммы, даты, контрагенты — не «объясните активность».' },
-  m6: { objectives: ['Искать adverse media', 'Писать EDD report', 'Cross-reference OSINT'], takeaways: ['Source + date для каждого факта', 'Executive summary first', 'OSINT = твоё конкурентное преимущество'], proTip: 'Сохраняй скриншоты источников с датой в case file.' },
-  m7: { objectives: ['Различать fraud и AML', 'Распознавать ATO/APP', 'Работать с mule patterns'], takeaways: ['Mule = fraud + AML intersection', 'APP = client authorized scam', 'Chargeback ≠ AML но связано'], proTip: 'Mule кейсы часто идут параллельно в Fraud и AML teams.' },
-  m8: { objectives: ['Понимать Travel Rule', 'Screen crypto wallets', 'Детектить mixer exposure'], takeaways: ['VASP vs unhosted wallet', 'Mixer = extreme red flag', 'Fiat-crypto correlation key'], proTip: 'DeFi on-chain = полностью видим — используй OSINT mindset.' },
-  m9: { objectives: ['Распознавать TBML', 'Сверять trade documents', 'Находить invoice anomalies'], takeaways: ['Over/under-invoicing', 'Phantom shipping', 'Shell trading companies'], proTip: 'Сравни invoice price с рыночной через OSINT.' },
-  m10: { objectives: ['Знать high-risk industries', 'Применять RBA', 'Понимать DNFBP'], takeaways: ['Cash-intensive = high risk', 'Real estate = integration stage', 'RBA = proportional controls'], proTip: 'Industry + geography + product = risk score formula.' },
-  m11: { objectives: ['Писать quality case notes', 'Проходить QA review', 'Готовиться к regulatory sample'], takeaways: ['Context → Analysis → Decision', 'Consistency = KPI', 'Incomplete docs = regulatory finding'], proTip: 'Пиши case notes так, будто завтра придёт FCA.' },
-  m12: { objectives: ['Понимать 3 lines of defence', 'Знать роль MLRO', 'Готовиться к regulatory exam'], takeaways: ['Ты — 2nd line', 'QA score = твой KPI', 'Sample cases запрашивают всегда'], proTip: 'Internal audit findings часто начинаются с плохого audit trail.' },
-  m13: { objectives: ['Знать predicate offences', 'Связывать corruption с PEP', 'Понимать tax evasion в AML'], takeaways: ['ML needs predicate crime', 'FCPA / UK Bribery Act', 'AMLD6: tax crimes = predicate'], proTip: 'Unusual consultant payments to offshore = bribery red flag.' },
-  m14: { objectives: ['Выбрать career path', 'Составить CV', 'Подготовиться к CAMS'], takeaways: ['KYC/TM/Sanctions/EDD/Fraud/Crypto paths', 'ACAMS = gold standard', 'OSINT → EDD advantage'], proTip: 'Bullet points на английском с метриками: alerts reviewed, SARs filed.' },
-};
+const MODULES: CourseModule[] = COURSE_MODULES;
+const MODULE_META = COURSE_MODULE_META;
 
 const OSINT_MODULES: Module[] = [
   {
@@ -3798,6 +3424,9 @@ function ModuleView({ moduleId, lang, onNavigate, track = 'aml' }: {
   const mod = modules.find((m) => m.id === moduleId)!;
   const meta = getMeta(lang, mod);
   const modMeta = metaMap[moduleId];
+  const courseMod = track === 'aml' ? (mod as CourseModule) : null;
+  const practiceTasks = courseMod?.practiceTasks ?? [];
+  const hasPractice = !!(mod.practiceCaseId || practiceTasks.length > 0);
   const [tab, setTab] = useCanvasState(`${track}-mod-tab-${moduleId}`, 'lesson');
   const [passedModules] = useCanvasState<string[]>(passedKey, []);
 
@@ -3833,7 +3462,7 @@ function ModuleView({ moduleId, lang, onNavigate, track = 'aml' }: {
         tab={tab}
         onTab={setTab}
         hasGlossary={mod.termIds.length > 0}
-        hasPractice={!!mod.practiceCaseId}
+        hasPractice={hasPractice}
       />
 
       {tab === 'lesson' && modMeta && (
@@ -3891,6 +3520,24 @@ function ModuleView({ moduleId, lang, onNavigate, track = 'aml' }: {
               </CardBody>
             </Card>
           )}
+          {moduleId === 'm4' && (
+            <Card>
+              <CardHeader>{t(lang, 'lessonFlowTitle')}</CardHeader>
+              <CardBody>
+                <FlowDiagram
+                  steps={[
+                    { id: 'e1', label: 'Trigger' }, { id: 'e2', label: lang === 'ru' ? 'OSINT / реестры' : 'OSINT / registries' },
+                    { id: 'e3', label: 'UBO' }, { id: 'e4', label: 'RFI' },
+                    { id: 'e5', label: lang === 'ru' ? 'Отчёт MLRO' : 'MLRO report' },
+                  ]}
+                  edges={[
+                    { from: 'e1', to: 'e2' }, { from: 'e2', to: 'e3' },
+                    { from: 'e3', to: 'e4' }, { from: 'e4', to: 'e5' },
+                  ]}
+                />
+              </CardBody>
+            </Card>
+          )}
           {moduleId === 'm5' && (
             <Card>
               <CardHeader>{t(lang, 'lessonFlowTitle')}</CardHeader>
@@ -3909,7 +3556,7 @@ function ModuleView({ moduleId, lang, onNavigate, track = 'aml' }: {
               </CardBody>
             </Card>
           )}
-          {moduleId === 'm8' && (
+          {moduleId === 'm6' && (
             <Card>
               <CardHeader>Crypto AML Flow</CardHeader>
               <CardBody>
@@ -3943,7 +3590,26 @@ function ModuleView({ moduleId, lang, onNavigate, track = 'aml' }: {
         <Text tone="secondary">{lang === 'ru' ? 'В этом модуле нет отдельных терминов — см. полный глоссарий.' : 'No module-specific terms — see full glossary.'}</Text>
       )}
 
-      {tab === 'practice' && mod.practiceCaseId && <CaseEvaluator caseId={mod.practiceCaseId} lang={lang} />}
+      {tab === 'practice' && (
+        <Stack gap={12}>
+          {practiceTasks.length > 0 && (
+            <>
+              <H3>{t(lang, 'tabPracticeTasks')}</H3>
+              <PracticeTasksPanel tasks={practiceTasks} lang={lang} />
+            </>
+          )}
+          {mod.practiceCaseId && (
+            <>
+              {practiceTasks.length > 0 && <Divider />}
+              <H3>{t(lang, 'tabPractice')} — Case Manager</H3>
+              <CaseEvaluator caseId={mod.practiceCaseId} lang={lang} />
+            </>
+          )}
+          {!hasPractice && (
+            <Text tone="secondary">{lang === 'ru' ? 'Практика для этого модуля скоро появится.' : 'Practice for this module coming soon.'}</Text>
+          )}
+        </Stack>
+      )}
 
       {tab === 'exam' && (
         <Stack gap={16}>
@@ -4101,7 +3767,7 @@ function InterviewTrainerView({ lang }: { lang: Lang }) {
       {tab === 'cv' && (
         <Stack gap={12}>
           <Callout tone="info" title="Elevator pitch (60 sec)">
-            Financial Crime Investigator transitioning to AML/KYC Compliance Analyst. OSINT background → EDD, adverse media, UBO research. Course completed: 14 AML modules + OSINT track + 350+ practice cases.
+            Financial Crime Investigator transitioning to AML/KYC Compliance Analyst. OSINT background → EDD, adverse media, UBO research. Course completed: 8 AML modules + OSINT track + 350+ practice cases.
           </Callout>
           <Table
             headers={['Section', 'Content']}
@@ -4136,10 +3802,11 @@ function CourseFooterNav({ lang, view, onNavigate, passedModules, passedOsint, a
           <Text size="small" weight="medium">{t(lang, 'footerAml')}</Text>
           <Row gap={6} wrap>
             {btn('home', t(lang, 'navHome'))}
-            {MODULES.slice(0, 7).map((m) => <span key={m.id}>{btn(m.id, m.id.toUpperCase())}</span>)}
+            {btn('my-progress', t(lang, 'navMyProgress'))}
+            {MODULES.slice(0, 4).map((m) => <span key={m.id}>{btn(m.id, m.id.toUpperCase())}</span>)}
           </Row>
           <Row gap={6} wrap>
-            {MODULES.slice(7).map((m) => <span key={m.id}>{btn(m.id, m.id.toUpperCase())}</span>)}
+            {MODULES.slice(4).map((m) => <span key={m.id}>{btn(m.id, m.id.toUpperCase())}</span>)}
             {allModulesPassed && btn('final-exam', t(lang, 'finalExamTitle'))}
           </Row>
         </Stack>
@@ -4214,6 +3881,7 @@ export default function AmlKycTraining() {
 
   const navOptions = [
     { value: 'home', label: t(lang, 'navHome') },
+    { value: 'my-progress', label: t(lang, 'navMyProgress') },
     { value: 'osint-home', label: t(lang, 'navOsintTrack') },
     { value: 'interview-trainer', label: t(lang, 'navInterview') },
     { value: 'polygone', label: `${t(lang, 'navPolygone')} (${PRACTICE_CASES.length})` },
@@ -4277,13 +3945,12 @@ export default function AmlKycTraining() {
           <Table
             headers={[t(lang, 'direction'), t(lang, 'modulesCol'), t(lang, 'whereToGo')]}
             rows={[
-              ['KYC / Onboarding Analyst', 'M1, M2, M6', 'Banks, neobanks, EMI'],
-              ['Transaction Monitoring', 'M4, M5, M7', lang === 'ru' ? 'Все финтехи' : 'All fintechs'],
-              ['Sanctions Analyst', 'M3', 'Banks, payment providers'],
-              ['EDD / OSINT Researcher', 'M2, M6, O1-O6', lang === 'ru' ? 'Твой профиль!' : 'Your profile!'],
-              ['Fraud Analyst', 'M7', 'Fintech fraud teams'],
-              ['Crypto Compliance', 'M8', 'Exchanges, VASP, banks'],
-              ['QA / Audit', 'M11, M12', lang === 'ru' ? 'Senior path' : 'Senior path'],
+              ['KYC / Onboarding Analyst', 'M1, M2', 'Banks, neobanks, EMI'],
+              ['Sanctions / Screening Analyst', 'M3', 'Banks, payment providers'],
+              ['EDD / OSINT Researcher', 'M4, OSINT O1–O6', lang === 'ru' ? 'EDD-команды, Big4' : 'EDD teams, Big4'],
+              ['SAR / Reporting Analyst', 'M5', 'MLRO office, compliance'],
+              ['Crypto Compliance', 'M6', 'Exchanges, VASP, banks'],
+              ['Junior AML Analyst (generalist)', 'M1–M8', lang === 'ru' ? 'Банки, финтех' : 'Banks, fintech'],
             ]}
           />
 
@@ -4293,6 +3960,22 @@ export default function AmlKycTraining() {
             </Callout>
           )}
         </Stack>
+      )}
+
+      {view === 'my-progress' && (
+        <StudentCabinetView
+          lang={lang}
+          passedModules={passedModules}
+          passedOsint={passedOsint}
+          certified={certified}
+          osintCertified={osintCertified}
+          totalCases={PRACTICE_CASES.length}
+          osintModules={OSINT_MODULES.map((m) => ({
+            id: m.id,
+            title: m.title,
+            passed: passedOsint.includes(m.id),
+          }))}
+        />
       )}
 
       {view === 'osint-home' && (
@@ -4365,7 +4048,7 @@ export default function AmlKycTraining() {
             ]}
           />
           <Callout tone="info" title="4-недельный план">
-            Нед 1: М1–М2 + FATF · Нед 2: М3–М4 + OpenSanctions · Нед 3: М5–М6 + OSINT · Нед 4: CAMS + кейсы + резюме
+            Нед 1: М1–М2 + FATF · Нед 2: М3–М4 + OpenSanctions · Нед 3: М5–М6 + OSINT · Нед 4: М7–М8 + кейсы + отчёт
           </Callout>
         </Stack>
       )}
@@ -4375,9 +4058,9 @@ export default function AmlKycTraining() {
       <nav className="mobile-nav" aria-label="Mobile navigation">
         {[
           { id: 'home', label: 'AML' },
+          { id: 'my-progress', label: lang === 'ru' ? 'Отчёт' : 'Report' },
           { id: 'osint-home', label: 'OSINT' },
           { id: 'polygone', label: 'Cases' },
-          { id: 'interview-trainer', label: 'Career' },
           { id: 'resources', label: 'Books' },
         ].map((item) => (
           <button
