@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import {
   Button,
   Callout,
@@ -33,6 +33,7 @@ import { tc } from '../i18n/content-strings';
 import { getSessionUser } from '../lib/auth';
 import { AuthPanel } from './AuthPanel';
 import { buildAchievementShareText, shareFacebook, shareLinkedIn } from '../lib/social-share';
+import { countPassedCases } from '../lib/progress';
 
 const TASK_TYPE_LABEL: Record<'ru' | 'en', Record<PracticeTask['type'], string>> = {
   ru: { quiz: 'Тест', scenario: 'Сценарий', case: 'Кейс-расследование', communication: 'Имитация общения', research: 'Исследование' },
@@ -162,6 +163,19 @@ export function StudentCabinetView({
   const [profile, setProfile] = useCanvasState<StudentProfile>('student-profile', defaultProfile());
   const [completedTasks] = useCanvasState<string[]>('completed-tasks', []);
   const [copied, setCopied] = useState(false);
+  const [caseProgressTick, setCaseProgressTick] = useState(0);
+
+  useEffect(() => {
+    const onCaseUpdate = (event: Event) => {
+      const key = (event as CustomEvent<{ key?: string }>).detail?.key ?? '';
+      if (key.includes('case-result')) setCaseProgressTick((n) => n + 1);
+    };
+    window.addEventListener('aml-kyc-academy:canvas-state', onCaseUpdate as EventListener);
+    return () => window.removeEventListener('aml-kyc-academy:canvas-state', onCaseUpdate as EventListener);
+  }, []);
+
+  const casesCompleted = useMemo(() => countPassedCases(), [caseProgressTick]);
+  const osintPassedCount = passedOsint.length;
 
   const allTasks = useMemo(
     () => courseModules.flatMap((m) => m.practiceTasks.map((t) => ({ ...t, moduleTitle: m.title }))),
@@ -185,7 +199,7 @@ export function StudentCabinetView({
         passed: m.passed,
         certified: m.passed,
       })),
-      casesCompleted: 0,
+      casesCompleted,
       totalCases,
       finalCertified: certified,
       osintCertified,
@@ -193,7 +207,7 @@ export function StudentCabinetView({
       generatedAt: now,
       lang: cl,
     };
-  }, [profile, passedModules, certified, osintCertified, completedTasks, allTasks, totalCases, lang, osintModules, courseModules, cl]);
+  }, [profile, passedModules, certified, osintCertified, completedTasks, allTasks, totalCases, casesCompleted, lang, osintModules, courseModules, cl]);
 
   const canCertificate = certified && (profile.fullName.trim().length > 0 || !!sessionUser);
   const shareText = buildAchievementShareText({
@@ -240,9 +254,19 @@ export function StudentCabinetView({
           tone={tasksDone === allTasks.length ? 'success' : 'warning'}
         />
         <Stat
-          value={certified ? (lang === 'ru' ? 'Да' : 'Yes') : (lang === 'ru' ? 'Нет' : 'No')}
+          value={`${casesCompleted}/${totalCases}`}
+          label={cl === 'ru' ? 'Кейсов пройдено' : 'Cases passed'}
+          tone={casesCompleted >= 10 ? 'success' : 'info'}
+        />
+        <Stat
+          value={`${osintPassedCount}/${osintModules.length}`}
+          label={cl === 'ru' ? 'OSINT модулей' : 'OSINT modules'}
+          tone={osintPassedCount === osintModules.length ? 'success' : 'info'}
+        />
+        <Stat
+          value={certified || osintCertified ? (lang === 'ru' ? 'Да' : 'Yes') : (lang === 'ru' ? 'Нет' : 'No')}
           label={lang === 'ru' ? 'Сертификат' : 'Certificate'}
-          tone={certified ? 'success' : 'info'}
+          tone={certified || osintCertified ? 'success' : 'info'}
         />
       </div>
 

@@ -10,20 +10,32 @@ import { computeDAGLayout } from './dag-layout';
 export { computeDAGLayout };
 
 const STORAGE_PREFIX = 'aml-kyc-academy:';
+const CANVAS_STATE_EVENT = 'aml-kyc-academy:canvas-state';
 
 export type SetCanvasState<T> = (action: T | ((prev: T) => T)) => void;
 
+function readCanvasStorage<T>(storageKey: string, defaultValue: T): T {
+  try {
+    const raw = localStorage.getItem(storageKey);
+    if (raw != null) return JSON.parse(raw) as T;
+  } catch {
+    /* ignore */
+  }
+  return defaultValue;
+}
+
 export function useCanvasState<T>(key: string, defaultValue: T): [T, SetCanvasState<T>] {
   const storageKey = STORAGE_PREFIX + key;
-  const [value, setValue] = useState<T>(() => {
-    try {
-      const raw = localStorage.getItem(storageKey);
-      if (raw != null) return JSON.parse(raw) as T;
-    } catch {
-      /* ignore */
-    }
-    return defaultValue;
-  });
+  const [value, setValue] = useState<T>(() => readCanvasStorage(storageKey, defaultValue));
+
+  useEffect(() => {
+    const onExternal = (event: Event) => {
+      const detail = (event as CustomEvent<{ key: string; value: T }>).detail;
+      if (detail?.key === storageKey) setValue(detail.value);
+    };
+    window.addEventListener(CANVAS_STATE_EVENT, onExternal as EventListener);
+    return () => window.removeEventListener(CANVAS_STATE_EVENT, onExternal as EventListener);
+  }, [storageKey]);
 
   useEffect(() => {
     try {
@@ -34,8 +46,12 @@ export function useCanvasState<T>(key: string, defaultValue: T): [T, SetCanvasSt
   }, [storageKey, value]);
 
   const setter = useCallback<SetCanvasState<T>>((action) => {
-    setValue((prev) => (typeof action === 'function' ? (action as (p: T) => T)(prev) : action));
-  }, []);
+    setValue((prev) => {
+      const next = typeof action === 'function' ? (action as (p: T) => T)(prev) : action;
+      window.dispatchEvent(new CustomEvent(CANVAS_STATE_EVENT, { detail: { key: storageKey, value: next } }));
+      return next;
+    });
+  }, [storageKey]);
 
   return [value, setter];
 }

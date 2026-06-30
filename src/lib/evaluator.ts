@@ -130,17 +130,137 @@ export function matchesGroup(text: string, group: string[]): boolean {
   return group.some((p) => matchesPattern(text, p));
 }
 
-export function evaluateAnswer(text: string, rubric: RubricCriterion[]): EvalResult {
+export type EvalLang = 'ru' | 'en';
+
+export type EvaluateOptions = {
+  lang?: EvalLang;
+  /** Minimum word count before scoring (default 12). */
+  minWords?: number;
+};
+
+const CRITERION_LABEL_EN: Record<string, string> = {
+  cdd: 'CDD / verification level',
+  risk: 'Client risk assessment',
+  flags: 'Red flags / absence of flags',
+  decision: 'Decision approve/EDD/reject',
+  monitor: 'Ongoing monitoring',
+  edd: 'EDD required',
+  pep: 'PEP status considered',
+  media: 'Adverse media review',
+  docs: 'SOW/SOF, UBO, declarations',
+  approval: 'Senior / MLRO approval',
+  verify: 'Identifier verification',
+  'not-auto': 'No auto-close without review',
+  osint: 'OSINT / registries',
+  match: 'True vs false match logic',
+  action: 'Next step (freeze/SAR/block)',
+  alert: 'TM alert type',
+  profile: 'Profile mismatch',
+  rfi: 'RFI / client questions',
+  next: 'Escalation / SAR / closure',
+  typology: 'Fraud typology (ATO/scam/APP)',
+  indicators: 'Fraud indicators',
+  report: 'SAR / fraud report / police',
+  vasp: 'VASP / Travel Rule',
+  analytics: 'Blockchain analytics',
+  sof: 'SOF / origin of funds or crypto',
+  tbml: 'Trade-based ML typology',
+  price: 'Price / market mismatch',
+  route: 'Suspicious trade route / intermediary',
+  sources: 'OSINT sources',
+  doc: 'Documentation in case notes',
+  chain: 'Investigation chain',
+  suspicion: 'Reasonable suspicion',
+  tipping: 'No tipping off',
+  mlro: 'MLRO escalation',
+  sar: 'SAR filing decision',
+  structure: 'Corporate structure',
+  shell: 'Shell / nominee detection',
+  jurisdiction: 'HRJ / FATF list',
+  purpose: 'Economic purpose of transaction',
+  corridor: 'Corridor / counterparty risk',
+  ctr: 'CTR / reporting thresholds',
+  structuring: 'Cash structuring',
+  business: 'Cash-intensive business fit',
+  wire: 'Wire transfer analysis',
+  beneficiary: 'Beneficiary / ordering party check',
+  sanctions: 'Sanctions / name screening',
+  protocol: 'DeFi protocol risk',
+  wallet: 'Wallet clustering / exposure',
+  mixer: 'Mixer / bridge / privacy coin',
+  kyc: 'Unhosted wallet / KYC gap',
+  exercise: 'Exercise completion',
+};
+
+export function localizeRubric(rubric: RubricCriterion[], lang: EvalLang): RubricCriterion[] {
+  if (lang === 'ru') return rubric;
+  return rubric.map((c) => ({
+    ...c,
+    label: CRITERION_LABEL_EN[c.id] ?? c.label,
+  }));
+}
+
+const EVAL_MSG: Record<EvalLang, {
+  tooShort: (min: number) => string;
+  scoredByMeaning: string;
+  found: (labels: string) => string;
+  addMeaning: (labels: string) => string;
+  missingMany: (n: number) => string;
+  riskyPhrase: (phrase: string, block: string) => string;
+  verdict: Record<Verdict, string>;
+}> = {
+  ru: {
+    tooShort: (min) =>
+      `Ответ слишком короткий (нужно минимум ${min} слов). Опиши red flags, шаги расследования и решение подробнее — порядок слов и знаки препинания не важны.`,
+    scoredByMeaning: 'Оценка по смыслу и ключевым пунктам — не требуется дословное совпадение.',
+    found: (labels) => `Засчитано: ${labels}.`,
+    addMeaning: (labels) => `Добавь по смыслу: ${labels}.`,
+    missingMany: (n) => `Не хватает ${n} пунктов — см. список ниже.`,
+    riskyPhrase: (phrase, block) => `Рискованная формулировка: «${phrase}» — пересмотри блок «${block}».`,
+    verdict: {
+      correct: 'Сильный ответ — логика расследования понятна.',
+      partial_ok: 'В целом верно — доработай пробелы перед закрытием кейса.',
+      partial_bad: 'Частично верно — перечитай урок и добавь недостающие элементы.',
+      incorrect: 'Недостаточно ключевых пунктов — опирайся на задания кейса и глоссарий.',
+    },
+  },
+  en: {
+    tooShort: (min) =>
+      `Answer is too short (minimum ${min} words). Describe red flags, investigation steps, and your decision — exact wording does not matter.`,
+    scoredByMeaning: 'Scored by meaning and key points — no verbatim match required.',
+    found: (labels) => `Credited: ${labels}.`,
+    addMeaning: (labels) => `Add by meaning: ${labels}.`,
+    missingMany: (n) => `${n} items still missing — see list below.`,
+    riskyPhrase: (phrase, block) => `Risky phrasing: "${phrase}" — revisit "${block}".`,
+    verdict: {
+      correct: 'Strong answer — investigation logic is clear.',
+      partial_ok: 'Mostly correct — close the gaps before closing the case.',
+      partial_bad: 'Partially correct — review the lesson and add missing elements.',
+      incorrect: 'Not enough key points — use case tasks and the glossary.',
+    },
+  },
+};
+
+function countWords(text: string): number {
+  return text.trim().split(/\s+/).filter(Boolean).length;
+}
+
+export function evaluateAnswer(text: string, rubric: RubricCriterion[], options: EvaluateOptions = {}): EvalResult {
+  const lang = options.lang ?? 'ru';
+  const msg = EVAL_MSG[lang];
+  const minWords = options.minWords ?? 12;
   const trimmed = text.trim();
-  if (trimmed.length < 15) {
+  const localizedRubric = localizeRubric(rubric, lang);
+
+  if (countWords(trimmed) < minWords) {
     return {
       verdict: 'incorrect',
       score: 0,
       maxScore: 100,
       percent: 0,
       found: [],
-      missing: rubric.map((r) => r.label),
-      remarks: ['Ответ слишком короткий. Опиши red flags, шаги расследования и решение подробнее — порядок слов и знаки препинания не важны.'],
+      missing: localizedRubric.map((r) => r.label),
+      remarks: [msg.tooShort(minWords)],
       mistakes: [],
     };
   }
@@ -152,7 +272,7 @@ export function evaluateAnswer(text: string, rubric: RubricCriterion[]): EvalRes
   let maxScore = 0;
   let requiredMissed = 0;
 
-  for (const criterion of rubric) {
+  for (const criterion of localizedRubric) {
     maxScore += criterion.weight;
     const groups = criterion.patterns ?? [];
     let hit = false;
@@ -178,48 +298,46 @@ export function evaluateAnswer(text: string, rubric: RubricCriterion[]): EvalRes
     if (criterion.mistakePatterns) {
       for (const group of criterion.mistakePatterns) {
         if (matchesGroup(trimmed, group)) {
-          mistakes.push(`Рискованная формулировка: «${group[0]}» — пересмотри блок «${criterion.label}».`);
+          mistakes.push(msg.riskyPhrase(group[0], criterion.label));
           score = Math.max(0, score - Math.round(criterion.weight * 0.4));
         }
       }
     }
   }
 
-  const wordCount = trimmed.split(/\s+/).length;
+  const wordCount = countWords(trimmed);
   if (wordCount >= 60) score += 4;
   if (wordCount >= 100) score += 6;
   maxScore += 10;
   score = Math.min(score, maxScore);
 
   const percent = maxScore > 0 ? Math.round((score / maxScore) * 100) : 0;
-  const foundRatio = found.length / Math.max(1, rubric.length);
+  const foundRatio = found.length / Math.max(1, localizedRubric.length);
 
-  const remarks: string[] = [
-    'Оценка по смыслу и ключевым пунктам — не требуется дословное совпадение.',
-  ];
+  const remarks: string[] = [msg.scoredByMeaning];
   if (found.length > 0) {
-    remarks.push(`Засчитано: ${found.map((f) => f.label).join(', ')}.`);
+    remarks.push(msg.found(found.map((f) => f.label).join(', ')));
   }
   if (missing.length > 0 && missing.length <= 5) {
-    remarks.push(`Добавь по смыслу: ${missing.slice(0, 5).join(', ')}.`);
+    remarks.push(msg.addMeaning(missing.slice(0, 5).join(', ')));
   } else if (missing.length > 5) {
-    remarks.push(`Не хватает ${missing.length} пунктов — см. список ниже.`);
+    remarks.push(msg.missingMany(missing.length));
   }
   if (mistakes.length > 0) remarks.push(...mistakes);
 
   let verdict: Verdict;
   if (percent >= 78 && requiredMissed === 0 && mistakes.length === 0) {
     verdict = 'correct';
-    remarks.unshift('Сильный ответ — логика расследования понятна.');
+    remarks.unshift(msg.verdict.correct);
   } else if (percent >= 55 && requiredMissed <= 1) {
     verdict = 'partial_ok';
-    remarks.unshift('В целом верно — доработай пробелы перед закрытием кейса.');
+    remarks.unshift(msg.verdict.partial_ok);
   } else if (percent >= 30 || foundRatio >= 0.35) {
     verdict = 'partial_bad';
-    remarks.unshift('Частично верно — перечитай урок и добавь недостающие элементы.');
+    remarks.unshift(msg.verdict.partial_bad);
   } else {
     verdict = 'incorrect';
-    remarks.unshift('Недостаточно ключевых пунктов — опирайся на задания кейса и глоссарий.');
+    remarks.unshift(msg.verdict.incorrect);
   }
 
   return { verdict, score, maxScore, percent, found, missing, remarks, mistakes };

@@ -40,6 +40,7 @@ import { tc, getCategoryLabels } from './i18n/content-strings';
 import { applyGlossaryLocale } from './data/glossary-i18n';
 import { CASE_SCENARIOS_EN } from './data/case-scenarios-en';
 import { refreshSession, scheduleProgressSync } from './lib/auth';
+import { CASE_PASS_PERCENT, countPassedCases, isCasePassed, markModuleCasePassed } from './lib/progress';
 import { getOsintModules, getOsintModuleMeta as getOsintModuleMetaContent, getOsintModuleTitle } from './data/osint-localized';
 import { localizeRegulations, localizeRegulation, getRegulationRegions } from './data/regulations-i18n';
 
@@ -1773,12 +1774,12 @@ const OSINT_MODULES: Module[] = [
 ];
 
 const OSINT_MODULE_META: Record<string, { objectives: string[]; takeaways: string[]; proTip: string }> = {
-  o1: { objectives: ['Понять OSINT cycle', 'Знать OPSEC и GDPR', 'Document chain of custody'], takeaways: ['Only public sources', '2+ sources for material facts', 'Internal only — no tipping off'], proTip: 'Начни каждый кейс с written scope: что ищешь и зачем.' },
-  o2: { objectives: ['Google dorks', 'Archives', 'Multi-language search'], takeaways: ['site: and quotes — твои друзья', 'Wayback for deleted claims', 'Local language keywords'], proTip: 'Сохраняй search string в case notes для reproducibility.' },
-  o3: { objectives: ['Registry navigation', 'Shell detection', 'UBO chains'], takeaways: ['Registry > social media', 'Mass address = shell signal', 'Map to natural person'], proTip: 'OpenCorporates + local registry — always both.' },
-  o4: { objectives: ['Source tiering', 'Weight acquittal vs conviction', 'Deduplicate news'], takeaways: ['Tier 1 first', 'Recency + severity', 'One event ≠ 50 flags'], proTip: 'Translate local media — don\'t rely on English-only Google.' },
-  o5: { objectives: ['Verify LinkedIn', 'Lifestyle mismatch', 'Evidence screenshots'], takeaways: ['Cross-check employment', 'Instagram ≠ proof but triggers EDD', 'Full screenshot with URL/date'], proTip: 'PEP hidden in OSINT = same as undeclared PEP.' },
-  o6: { objectives: ['Write EDD report', 'Executive summary', 'Escalation path'], takeaways: ['Fact vs inference separated', 'Recommendation upfront', 'Negative findings documented'], proTip: 'Пиши report для MLRO, который прочитает за 5 минут.' },
+  o1: { objectives: ['Понять OSINT cycle', 'Знать OPSEC и GDPR', 'Документировать chain of custody'], takeaways: ['Только открытые источники', '≥2 источника для material facts', 'Только internal — без tipping off'], proTip: 'Начни каждый кейс с written scope: что ищешь и зачем.' },
+  o2: { objectives: ['Google dorks', 'Архивы', 'Поиск на нескольких языках'], takeaways: ['site: и кавычки — твои друзья', 'Wayback для удалённых claims', 'Ключевые слова на local language'], proTip: 'Сохраняй search string в case notes для reproducibility.' },
+  o3: { objectives: ['Навигация по реестрам', 'Shell detection', 'UBO chains'], takeaways: ['Реестр > соцсети', 'Mass address = shell signal', 'Доведи до natural person'], proTip: 'OpenCorporates + local registry — всегда оба.' },
+  o4: { objectives: ['Source tiering', 'Acquittal vs conviction', 'Дедупликация новостей'], takeaways: ['Сначала Tier 1', 'Recency + severity', 'Одно событие ≠ 50 flags'], proTip: 'Переводи local media — не полагайся только на English Google.' },
+  o5: { objectives: ['Верификация LinkedIn', 'Lifestyle mismatch', 'Скриншоты evidence'], takeaways: ['Cross-check employment', 'Instagram ≠ proof, но триггер EDD', 'Полный screenshot с URL/датой'], proTip: 'PEP, найденный в OSINT = незадекларированный PEP.' },
+  o6: { objectives: ['Написать EDD report', 'Executive summary', 'Escalation path'], takeaways: ['Факты vs inference раздельно', 'Recommendation в начале', 'Negative findings задокументированы'], proTip: 'Пиши report для MLRO, который прочитает за 5 минут.' },
 };
 
 function getOsintModuleMeta(lang: Lang, mod: Module): { title: string; subtitle: string } {
@@ -1804,13 +1805,6 @@ const FINAL_PRACTICAL_CASE_IDS = ['case-001', 'case-002', 'case-003', 'case-004'
 const FINAL_THEORY_PASS = 32;
 const FINAL_PRACTICAL_PASS = 7;
 const FINAL_PRACTICAL_MIN_SCORE = 60;
-
-const VERDICT_LABELS: Record<Verdict, string> = {
-  correct: 'Верно',
-  partial_ok: 'Верно, но…',
-  partial_bad: 'Неверно, но…',
-  incorrect: 'Неверно',
-};
 
 const VERDICT_TONE: Record<Verdict, 'success' | 'warning' | 'danger' | 'info'> = {
   correct: 'success',
@@ -2204,11 +2198,13 @@ function ModulePathGrid({ lang, passedModules, currentView, onSelect, modules, g
   );
 }
 
-function ModuleStepBar({ lang, tab, onTab, hasGlossary, hasPractice }: { lang: Lang; tab: string; onTab: (t: string) => void; hasGlossary: boolean; hasPractice: boolean }) {
+function ModuleStepBar({ lang, tab, onTab, hasGlossary, hasPractice, practiceRequired }: {
+  lang: Lang; tab: string; onTab: (t: string) => void; hasGlossary: boolean; hasPractice: boolean; practiceRequired?: boolean;
+}) {
   const steps = [
     { id: 'lesson', label: t(lang, 'stepLearn'), required: true },
     ...(hasGlossary ? [{ id: 'glossary', label: t(lang, 'stepGlossary'), required: false }] : []),
-    ...(hasPractice ? [{ id: 'practice', label: t(lang, 'stepPractice'), required: false }] : []),
+    ...(hasPractice ? [{ id: 'practice', label: t(lang, 'stepPractice'), required: practiceRequired ?? false }] : []),
     { id: 'exam', label: t(lang, 'stepExam'), required: true },
   ];
 
@@ -2339,26 +2335,41 @@ function FinalPracticalCase({ caseId, lang, onPass, alreadyPassed }: { caseId: s
   const [result] = useCanvasState<EvalResult | null>(`case-result-${caseId}`, null);
   const passed = alreadyPassed || (result !== null && result.percent >= FINAL_PRACTICAL_MIN_SCORE);
 
+  useEffect(() => {
+    if (!alreadyPassed && result && result.percent >= FINAL_PRACTICAL_MIN_SCORE) {
+      onPass();
+    }
+  }, [alreadyPassed, result, onPass]);
+
   return (
     <Stack gap={8}>
       {!alreadyPassed && <CaseEvaluator caseId={caseId} lang={lang} />}
       {alreadyPassed && <Text tone="secondary">{t(lang, 'passed')}</Text>}
       {passed && !alreadyPassed && (
-        <Button variant="primary" onClick={onPass}>{lang === 'ru' ? 'Засчитать кейс' : 'Credit this case'}</Button>
+        <Callout tone="success" title={lang === 'ru' ? 'Кейс засчитан' : 'Case credited'}>
+          {lang === 'ru' ? `Оценка ${result?.percent}% — кейс добавлен в прогресс.` : `Score ${result?.percent}% — case added to your progress.`}
+        </Callout>
       )}
     </Stack>
   );
 }
 
-function ExamBlock({ moduleId, exam, passScore, lang, onPass, hideModulePassedCallout, skipModuleUnlock, forcedPassed, passedKey = 'passed-modules' }: {
+function ExamBlock({ moduleId, exam, passScore, lang, onPass, hideModulePassedCallout, skipModuleUnlock, forcedPassed, passedKey = 'passed-modules', practiceCaseId }: {
   moduleId: string; exam: ExamQuestion[]; passScore: number; lang: Lang; onPass: () => void;
   hideModulePassedCallout?: boolean; skipModuleUnlock?: boolean; forcedPassed?: boolean; passedKey?: string;
+  practiceCaseId?: string;
 }) {
   const theme = useHostTheme();
   const key = `exam-${moduleId}`;
   const [answers, setAnswers] = useCanvasState<Record<string, string>>(`${key}-answers`, {});
   const [submitted, setSubmitted] = useCanvasState(`${key}-submitted`, false);
   const [passedModules, setPassedModules] = useCanvasState<string[]>(passedKey, []);
+  const [caseResult] = useCanvasState<EvalResult | null>(
+    practiceCaseId ? `case-result-${practiceCaseId}` : `case-result-gate-${moduleId}`,
+    null,
+  );
+
+  const practicePassed = !practiceCaseId || (caseResult?.percent ?? 0) >= CASE_PASS_PERCENT || isCasePassed(practiceCaseId);
 
   const score = exam.filter((q) => q.options.find((o) => o.id === answers[q.id])?.correct).length;
   const passed = score >= passScore;
@@ -2422,7 +2433,9 @@ function ExamBlock({ moduleId, exam, passScore, lang, onPass, hideModulePassedCa
                 })}
                 {submitted && (
                   <Text size="small" tone="secondary">
-                    {answers[q.id] && q.options.find((o) => o.id === answers[q.id])?.correct ? 'Верно. ' : 'Неверно. '}
+                    {answers[q.id] && q.options.find((o) => o.id === answers[q.id])?.correct
+                      ? `${t(lang, 'verdictCorrect')}. `
+                      : `${t(lang, 'verdictIncorrect')}. `}
                     {q.explain}
                   </Text>
                 )}
@@ -2434,9 +2447,18 @@ function ExamBlock({ moduleId, exam, passScore, lang, onPass, hideModulePassedCa
 
       <Row gap={12} align="center">
         {!submitted ? (
-          <Button variant="primary" onClick={submit} disabled={Object.keys(answers).length < exam.length}>
-            {t(lang, 'examSubmit')}
-          </Button>
+          <>
+            {!practicePassed && practiceCaseId && (
+              <Callout tone="warning" title={lang === 'ru' ? 'Сначала практика' : 'Complete practice first'}>
+                {lang === 'ru'
+                  ? `Пройди практический кейс модуля (оценка ≥${CASE_PASS_PERCENT}%) во вкладке «Практика», затем сдавай тест.`
+                  : `Complete the module practice case (score ≥${CASE_PASS_PERCENT}%) in the Practice tab before taking the exam.`}
+              </Callout>
+            )}
+            <Button variant="primary" onClick={submit} disabled={Object.keys(answers).length < exam.length || !practicePassed}>
+              {t(lang, 'examSubmit')}
+            </Button>
+          </>
         ) : (
           <>
             <Stat value={`${score}/${exam.length}`} label={t(lang, 'examResult')} tone={passed ? 'success' : 'danger'} />
@@ -2452,7 +2474,7 @@ function ExamBlock({ moduleId, exam, passScore, lang, onPass, hideModulePassedCa
   );
 }
 
-function CaseEvaluator({ caseId, lang }: { caseId: string; lang: Lang }) {
+function CaseEvaluator({ caseId, lang, moduleId }: { caseId: string; lang: Lang; moduleId?: string }) {
   const theme = useHostTheme();
   const pc = getCaseById(caseId);
   const [answer, setAnswer] = useCanvasState(`case-answer-${caseId}`, '');
@@ -2463,10 +2485,16 @@ function CaseEvaluator({ caseId, lang }: { caseId: string; lang: Lang }) {
   }
 
   const content = getLocalizedCase(pc, lang);
+  const evalLang = contentLang(lang) === 'ru' ? 'ru' : 'en';
+  const minWords = Math.max(12, Math.min(pc.minWords, 30));
+  const wordCount = answer.trim().split(/\s+/).filter(Boolean).length;
 
   const runCheck = () => {
-    const evalResult = evaluateAnswer(answer, pc.rubric);
+    const evalResult = evaluateAnswer(answer, pc.rubric, { lang: evalLang, minWords });
     setResult(evalResult);
+    if (moduleId && evalResult.percent >= CASE_PASS_PERCENT) {
+      markModuleCasePassed(moduleId);
+    }
   };
 
   const placeholders: Record<string, string> = {
@@ -2507,11 +2535,11 @@ function CaseEvaluator({ caseId, lang }: { caseId: string; lang: Lang }) {
       />
 
       <Text size="small" tone="tertiary">
-        {t(lang, 'minWordsHint')}: {pc.minWords}
+        {t(lang, 'minWordsHint')}: {minWords} {lang === 'ru' ? `(рекомендуется ${pc.minWords})` : `(recommended ${pc.minWords})`}
       </Text>
 
       <Row gap={8} wrap>
-        <Button variant="primary" onClick={runCheck} disabled={answer.trim().length < 20}>
+        <Button variant="primary" onClick={runCheck} disabled={wordCount < minWords}>
           {t(lang, 'checkAnswer')}
         </Button>
       </Row>
@@ -2667,7 +2695,9 @@ function RegulationsView({ lang }: { lang: Lang }) {
   );
 }
 
-function EnglishView() {
+function EnglishView({ lang }: { lang: Lang }) {
+  const cl = contentLang(lang);
+  const ru = cl === 'ru';
   const [, setPanel] = useCanvasState<DetailPanelState>('detail-panel', null);
   const [lessonId, setLessonId] = useCanvasState('english-lesson', 'en-basics');
   const [catFilter, setCatFilter] = useCanvasState<EnglishLesson['category'] | 'all'>('english-cat', 'all');
@@ -2686,25 +2716,27 @@ function EnglishView() {
     }));
     rubric.push({
       id: 'exercise',
-      label: 'Выполнение упражнения',
+      label: 'Exercise completion',
       weight: 25,
       required: true,
       patterns: [['pep', 'edd', 'sar', 'rfi', 'sanction', 'alert', 'due diligence', 'sow', 'ubo', 'suspicious', 'transaction', 'compliance', 'turnover', 'revenue', 'invoice', 'profit', 'balance']],
     });
-    setEnResult(evaluateAnswer(practice, rubric));
+    setEnResult(evaluateAnswer(practice, rubric, { lang: 'en', minWords: 8 }));
   };
 
   return (
     <Stack gap={16}>
-      <Callout tone="success" title="English: Technical + Economic + Banking">
-        8 уроков с аудио (британское произношение). Нажми ▶ Audio чтобы услышать фразу. Economic English — для EDD, trade ML, financial statements.
+      <Callout tone="success" title={ru ? 'English: Technical + Economic + Banking' : 'English: Technical + Economic + Banking'}>
+        {ru
+          ? '8 уроков с аудио (британское произношение). Нажми ▶ Audio. Economic English — для EDD, trade ML, financial statements.'
+          : '8 lessons with audio (British pronunciation). Click ▶ Audio. Economic English for EDD, trade ML, and financial statements.'}
       </Callout>
 
       <Select
         value={catFilter}
         onChange={(v) => setCatFilter(v as EnglishLesson['category'] | 'all')}
         options={[
-          { value: 'all', label: 'Все категории' },
+          { value: 'all', label: ru ? 'Все категории' : 'All categories' },
           ...Object.entries(ENGLISH_CATEGORY_LABELS).map(([k, v]) => ({ value: k, label: v })),
         ]}
       />
@@ -2716,14 +2748,14 @@ function EnglishView() {
       />
 
       <Row gap={8} wrap>
-        <DetailButton label="Полный урок" onClick={() => lesson && setPanel({ kind: 'english', id: lesson.id })} />
-        <AudioButton text={lesson.phrases[0]?.en ?? ''} label="▶ Первая фраза" />
+        <DetailButton label={ru ? 'Полный урок' : 'Full lesson'} onClick={() => lesson && setPanel({ kind: 'english', id: lesson.id })} />
+        <AudioButton text={lesson.phrases[0]?.en ?? ''} label={ru ? '▶ Первая фраза' : '▶ First phrase'} />
         <Button variant="ghost" onClick={() => lesson.phrases.forEach((p, i) => setTimeout(() => speakEnglish(p.en), i * 2500))}>
-          ▶ Все фразы
+          {ru ? '▶ Все фразы' : '▶ All phrases'}
         </Button>
       </Row>
 
-      <H3>Фразы с аудио</H3>
+      <H3>{ru ? 'Фразы с аудио' : 'Phrases with audio'}</H3>
       {lesson.phrases.map((p) => (
         <div key={p.en}>
           <Card>
@@ -2734,27 +2766,27 @@ function EnglishView() {
                   <AudioButton text={p.en} label="▶" />
                 </Row>
                 <Text size="small" tone="secondary">{p.ru}</Text>
-                <Text size="small" tone="tertiary">Контекст: {p.context}</Text>
+                <Text size="small" tone="tertiary">{ru ? 'Контекст' : 'Context'}: {p.context}</Text>
               </Stack>
             </CardBody>
           </Card>
         </div>
       ))}
 
-      <H3>Словарь (с аудио)</H3>
+      <H3>{ru ? 'Словарь (с аудио)' : 'Vocabulary (with audio)'}</H3>
       {lesson.vocabulary.map((v) => (
         <div key={v.term}>
           <Row gap={8} align="center" wrap>
             <Text weight="medium">{v.term}</Text>
-            <AudioButton text={v.example} label="▶ Пример" />
+            <AudioButton text={v.example} label={ru ? '▶ Пример' : '▶ Example'} />
             <Text size="small" tone="secondary">— {v.meaning}</Text>
           </Row>
           <Text size="small" tone="tertiary">{v.example}</Text>
         </div>
       ))}
 
-      <H3>Практика письма</H3>
-      <Callout tone="info" title="Задание">{lesson.exercise}</Callout>
+      <H3>{ru ? 'Практика письма' : 'Writing practice'}</H3>
+      <Callout tone="info" title={ru ? 'Задание' : 'Exercise'}>{lesson.exercise}</Callout>
       <TextArea
         value={practice}
         onChange={(v) => { setPractice(v); setEnResult(null); }}
@@ -2762,13 +2794,13 @@ function EnglishView() {
         rows={6}
       />
       <Row gap={8} wrap>
-        <Button variant="primary" onClick={checkEnglish} disabled={practice.trim().length < 20}>
-          Проверить English
+        <Button variant="primary" onClick={checkEnglish} disabled={practice.trim().split(/\s+/).filter(Boolean).length < 8}>
+          {ru ? 'Проверить English' : 'Check answer'}
         </Button>
       </Row>
 
       {enResult && (
-        <Callout tone={VERDICT_TONE[enResult.verdict]} title={`${VERDICT_LABELS[enResult.verdict]} — ${enResult.percent}%`}>
+        <Callout tone={VERDICT_TONE[enResult.verdict]} title={`${verdictLabel('en', enResult.verdict)} — ${enResult.percent}%`}>
           <Stack gap={6}>
             {enResult.remarks.map((r, i) => (
               <span key={i}><Text size="small">{r}</Text></span>
@@ -3547,6 +3579,7 @@ function ModuleView({ moduleId, lang, onNavigate, track = 'aml' }: {
         onTab={setTab}
         hasGlossary={mod.termIds.length > 0}
         hasPractice={hasPractice}
+        practiceRequired={!!mod.practiceCaseId}
       />
 
       {tab === 'lesson' && modMeta && (
@@ -3686,7 +3719,7 @@ function ModuleView({ moduleId, lang, onNavigate, track = 'aml' }: {
             <>
               {practiceTasks.length > 0 && <Divider />}
               <H3>{t(lang, 'tabPractice')} — Case Manager</H3>
-              <CaseEvaluator caseId={mod.practiceCaseId} lang={lang} />
+              <CaseEvaluator caseId={mod.practiceCaseId} lang={lang} moduleId={moduleId} />
             </>
           )}
           {!hasPractice && (
@@ -3697,7 +3730,15 @@ function ModuleView({ moduleId, lang, onNavigate, track = 'aml' }: {
 
       {tab === 'exam' && (
         <Stack gap={16}>
-          <ExamBlock moduleId={moduleId} exam={mod.exam} passScore={mod.passScore} lang={lang} onPass={() => {}} passedKey={passedKey} />
+          <ExamBlock
+            moduleId={moduleId}
+            exam={mod.exam}
+            passScore={mod.passScore}
+            lang={lang}
+            onPass={() => {}}
+            passedKey={passedKey}
+            practiceCaseId={mod.practiceCaseId}
+          />
           {isPassed && nextMod && (
             <Button variant="primary" onClick={() => onNavigate(nextView!)}>{t(lang, 'nextModule')} {getMeta(lang, nextMod).title}</Button>
           )}
@@ -4141,7 +4182,7 @@ export default function AmlKycTraining() {
 
       {view === 'regulations' && <RegulationsView lang={lang} />}
 
-      {view === 'english' && <EnglishView />}
+      {view === 'english' && <EnglishView lang={lang} />}
 
       {view === 'polygone' && <CaseLibraryView lang={lang} />}
 
@@ -4158,8 +4199,8 @@ export default function AmlKycTraining() {
           { id: 'home', label: t(lang, 'navHome').slice(0, 8) },
           { id: 'my-progress', label: t(lang, 'navMyProgress').slice(0, 8) },
           { id: 'news', label: t(lang, 'navNews').slice(0, 8) },
-          { id: 'polygone', label: 'Cases' },
-          { id: 'osint-home', label: 'OSINT' },
+          { id: 'polygone', label: t(lang, 'navPolygone').slice(0, 8) },
+          { id: 'osint-home', label: t(lang, 'navOsintTrack').slice(0, 8) },
         ].map((item) => (
           <button
             key={item.id}

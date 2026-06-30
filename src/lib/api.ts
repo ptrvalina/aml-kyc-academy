@@ -72,6 +72,7 @@ export type UserProgress = {
   passedModules?: string[];
   passedOsint?: string[];
   certified?: boolean;
+  osintCertified?: boolean;
   completedTasks?: string[];
 };
 

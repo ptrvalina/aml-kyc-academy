@@ -182,6 +182,7 @@ const PROGRESS_KEYS: Record<keyof UserProgress, string> = {
   passedModules: 'passed-modules',
   passedOsint: 'passed-osint-modules',
   certified: 'final-certified',
+  osintCertified: 'osint-certified',
   completedTasks: 'completed-tasks',
 };
 
@@ -194,6 +195,9 @@ export function applyServerProgress(progress: UserProgress): void {
   }
   if (typeof progress.certified === 'boolean') {
     localStorage.setItem(PROGRESS_KEYS.certified, JSON.stringify(progress.certified));
+  }
+  if (typeof progress.osintCertified === 'boolean') {
+    localStorage.setItem(PROGRESS_KEYS.osintCertified, JSON.stringify(progress.osintCertified));
   }
   if (progress.completedTasks) {
     localStorage.setItem(PROGRESS_KEYS.completedTasks, JSON.stringify(progress.completedTasks));
@@ -213,6 +217,7 @@ export function readLocalProgress(): UserProgress {
     passedModules: read(PROGRESS_KEYS.passedModules, []),
     passedOsint: read(PROGRESS_KEYS.passedOsint, []),
     certified: read(PROGRESS_KEYS.certified, false),
+    osintCertified: read(PROGRESS_KEYS.osintCertified, false),
     completedTasks: read(PROGRESS_KEYS.completedTasks, []),
   };
 }
